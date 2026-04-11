@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
     ImageBackground,
-    StyleSheet,
     View,
     Text,
     Image,
@@ -9,6 +8,7 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { styles } from './style'
 
 const STEPS = [
     {
@@ -22,14 +22,15 @@ const STEPS = [
         image: require('../../../assets/images/onboardin.png'),
     },
     {
-        title: 'Look Your Best',
-        subtitle: 'Get personalized style tips just for you.',
-        image: require('../../../assets/images/onboardin.png'),
+        title: 'Build outfits fast',
+        subtitle: 'Mix and match your pieces for daily wear or special events.',
+        image: require('../../../assets/images/onboarding3.png'),
     },
 ]
 
 type RootStackParamList = {
-    Onboarding: undefined
+    onboarding: undefined
+    signup: undefined
     Home: undefined
 }
 
@@ -42,7 +43,7 @@ export default function OnBoardingScreen() {
 
     const handleNext = () => {
         if (isLastStep) {
-            navigation.replace('Home')
+            navigation.replace('signup')
         } else {
             setCurrentStep(prev => prev + 1)
         }
@@ -92,7 +93,7 @@ export default function OnBoardingScreen() {
                 {/* Already have account */}
                 <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => navigation.replace('Home')}
+                    onPress={() => navigation.replace('signup')}
                 >
                     <Text style={styles.loginText}>I Already Have An Account</Text>
                 </TouchableOpacity>
@@ -100,72 +101,3 @@ export default function OnBoardingScreen() {
         </ImageBackground>
     )
 }
-
-const styles = StyleSheet.create({
-    background: { flex: 1 },
-    container: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 24,
-    },
-    title: {
-        color: '#fff',
-        fontSize: 28,
-        fontWeight: '800',
-        marginTop: 16,
-        textAlign: 'center',
-    },
-    subtitle: {
-        color: 'rgba(255,255,255,0.75)',
-        fontSize: 15,
-        textAlign: 'center',
-        marginTop: 8,
-    },
-    bottomBar: {
-        backgroundColor: '#1E293B',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        paddingHorizontal: 24,
-        paddingTop: 20,
-        paddingBottom: 36,
-        alignItems: 'center',
-        gap: 16,
-    },
-    dotsContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 4,
-    },
-    dot: {
-        height: 10,
-        borderRadius: 5,
-    },
-    dotActive: {
-        width: 28,
-        backgroundColor: '#4a90e2',
-    },
-    dotInactive: {
-        width: 10,
-        backgroundColor: 'rgba(255,255,255,0.35)',
-    },
-    nextButton: {
-        width: '100%',
-        backgroundColor: '#4a90e2',
-        borderRadius: 14,
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    nextButtonText: {
-        color: '#fff',
-        fontSize: 17,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-    },
-    loginText: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-})
