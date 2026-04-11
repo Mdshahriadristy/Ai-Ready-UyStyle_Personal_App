@@ -105,7 +105,7 @@ const SignInScreen = ({ navigation }: any) => {
                         <TouchableOpacity
                             style={styles.nextButton}
                             activeOpacity={0.85}
-                            onPress={() => navigation.navigate('home')}
+                            onPress={() => navigation.navigate('bottombar')}
                         >
                             <Text style={styles.nextButtonText}>
                                 Sign In

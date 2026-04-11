@@ -24,10 +24,6 @@ const SignupScreen = ({ navigation }: any) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleBack = () => {
-    navigation?.goBack();
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -42,7 +38,6 @@ const SignupScreen = ({ navigation }: any) => {
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
-            onPress={handleBack}
             activeOpacity={0.7}
           >
             <ChevronLeft color={'#000'} />

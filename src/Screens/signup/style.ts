@@ -6,12 +6,12 @@ export const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
     },
     container: {
-        flex: 1,
+        // flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 20,
-        paddingBottom: 80,
+        paddingBottom: 0,
     },
 
     backButton: {
@@ -83,7 +83,7 @@ export const styles = StyleSheet.create({
 
     spacer: {
         flex: 1,
-        minHeight: 32,
+        minHeight: 100,
     },
 
     footer: {
