@@ -2,6 +2,10 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { CirclePlus, Grid3x3, House, Layers, User } from 'lucide-react-native';
 import HomeScreen from '../Screens/Home/HomeScreen';
+import ClosetScreen from '../Screens/closet/ClosetScreen';
+import AdditemScreen from '../Screens/addItem/AdditemScreen';
+import OutfitScreen from '../Screens/outfit/OutfitScreen';
+import ProfileScreen from '../Screens/profile/ProfileScreen';
 
 export type BottomTabParamList = {
     Home: undefined;
@@ -51,10 +55,10 @@ const BottomTabs = () => {
             })}
         >
             <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Closet" component={HomeScreen} />
-            <Tab.Screen name="Add" component={HomeScreen} />
-            <Tab.Screen name="Outfits" component={HomeScreen} />
-            <Tab.Screen name="Profile" component={HomeScreen} />
+            <Tab.Screen name="Closet" component={ClosetScreen} />
+            <Tab.Screen name="Add" component={AdditemScreen} />
+            <Tab.Screen name="Outfits" component={OutfitScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 };
