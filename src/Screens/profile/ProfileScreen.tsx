@@ -19,11 +19,11 @@ const stats = [
 ];
 
 const menuItems = [
-    { label: 'Notifications', danger: false },
-    { label: 'Account Settings', danger: false },
-    { label: 'Privacy', danger: false },
-    { label: 'Help', danger: false },
-    { label: 'Logout', danger: true },
+    { label: 'Notifications', danger: false, screen: 'notification' },
+    { label: 'Account Settings', danger: false, screen: 'accountsettings' },
+    { label: 'Privacy', danger: false, screen: 'privacypolicy' },
+    { label: 'Help', danger: false, screen: 'help' },
+    { label: 'Logout', danger: true, },
 ];
 
 const favoriteLooks = [
@@ -71,7 +71,9 @@ const ProfileScreen = () => {
                 </View>
 
                 {/* Style Preferences */}
-                <TouchableOpacity style={styles.stylePrefs} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.stylePrefs} activeOpacity={0.8}
+                    onPress={() => navigation.navigate('preference')}
+                >
                     <View style={styles.stylePrefLeft}>
                         <View style={styles.stylePrefIcon}>
                             <Shirt size={20} color="#fff" />
@@ -105,7 +107,9 @@ const ProfileScreen = () => {
                 {/* Menu Items */}
                 <View style={styles.menuSection}>
                     {menuItems.map((item) => (
-                        <TouchableOpacity key={item.label} style={styles.menuRow} activeOpacity={0.7}>
+                        <TouchableOpacity key={item.label} style={styles.menuRow} activeOpacity={0.7}
+                            onPress={() => navigation.navigate(item.screen)}
+                        >
                             <Text style={[styles.menuLabel, item.danger && styles.menuLabelDanger]}>
                                 {item.label}
                             </Text>

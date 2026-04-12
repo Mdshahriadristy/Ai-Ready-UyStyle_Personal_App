@@ -106,7 +106,7 @@ const ProfileEditScreen = ({ navigation }: any) => {
 
                 {/* Save Button */}
                 <TouchableOpacity style={styles.saveBtn} activeOpacity={0.85}
-                
+                    onPress={navigation.goBack}
                 >
                     <Text style={styles.saveBtnText}>Save Changes</Text>
                 </TouchableOpacity>

@@ -11,10 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight, Search, Zap } from 'lucide-react-native';
 import { styles } from './style';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
     const [activeTab, setActiveTab] = useState<'wear' | 'build'>('wear');
-
+    const navigation = useNavigation<any>();
     const recentItems = [
         { id: 1, name: 'White Oversiz...', category: 'Top', image: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200' },
         { id: 2, name: 'Blue Straight J...', category: 'Bottom', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=200' },
@@ -95,7 +96,7 @@ const HomeScreen = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.tabBtn, activeTab === 'build' && styles.tabBtnActive]}
-                        onPress={() => setActiveTab('build')}
+                        onPress={() => navigation.navigate('combine')}
                         activeOpacity={0.8}
                     >
                         <Text style={[styles.tabText, activeTab === 'build' && styles.tabTextActive]}>
@@ -144,7 +145,9 @@ const HomeScreen = () => {
                 </View>
 
                 {/* Create Your Own */}
-                <TouchableOpacity style={styles.createBtn} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.createBtn} activeOpacity={0.85}
+                    onPress={() => navigation.navigate('combine')}
+                >
                     <Text style={styles.createBtnText}>Create Your Own</Text>
                 </TouchableOpacity>
 
