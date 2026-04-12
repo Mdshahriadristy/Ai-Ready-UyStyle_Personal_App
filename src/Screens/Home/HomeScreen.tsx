@@ -111,7 +111,7 @@ const HomeScreen = () => {
                         <Text style={styles.sectionTitle}>Recent Items</Text>
                         <TouchableOpacity style={styles.seeAll}>
                             <Text style={styles.seeAllText}>See All</Text>
-                            <ChevronRight size={14} color="#2869BD" />
+                            <ChevronRight size={14} color="#65758B" />
                         </TouchableOpacity>
                     </View>
                     <View style={styles.itemsRow}>
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
 
     // Today's Pick
     todayPick: {
-        marginHorizontal: 16,
+        marginHorizontal: 20,
         marginBottom: 16,
-        borderRadius: 16,
+        borderRadius: 12,
         overflow: 'hidden',
         height: 180,
     },
@@ -265,45 +265,52 @@ const styles = StyleSheet.create({
         right: 16,
         bottom: 16,
         alignItems: 'flex-end',
+        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        overflow: 'hidden',
+        height: '60%',
+        width: '40%',
+        justifyContent: 'center',
     },
     todayPickLabel: {
-        fontSize: 11,
+        fontSize: 20,
         fontFamily: 'InterRegular',
         color: 'rgba(255,255,255,0.85)',
         fontStyle: 'italic',
     },
     todayPickTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontFamily: 'InterBold',
         fontWeight: '700',
         color: '#fff',
-        textAlign: 'right',
-        lineHeight: 26,
+        textAlign: 'right'
     },
 
     // Tabs
     tabRow: {
         flexDirection: 'row',
-        marginHorizontal: 16,
-        marginBottom: 20,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 10,
-        padding: 4,
+        marginHorizontal: 20,
+        marginBottom: 24,
+        marginTop: 12,
+        gap: 8,
     },
     tabBtn: {
         flex: 1,
         paddingVertical: 10,
-        borderRadius: 8,
+        borderRadius: 12,
         alignItems: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     tabBtnActive: {
         backgroundColor: '#2869BD',
     },
     tabText: {
-        fontSize: 13,
-        fontFamily: 'InterMedium',
-        fontWeight: '500',
-        color: '#64748B',
+        fontSize: 14,
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+        color: '#0F1729',
     },
     tabTextActive: {
         color: '#fff',
@@ -317,14 +324,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        marginBottom: 12,
+        marginHorizontal: 20,
+        marginBottom: 14,
     },
     sectionTitle: {
         fontSize: 16,
         fontFamily: 'InterBold',
         fontWeight: '700',
-        color: '#1E293B',
+        color: '#0F1729',
     },
     seeAll: {
         flexDirection: 'row',
@@ -332,15 +339,15 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     seeAllText: {
-        fontSize: 13,
+        fontSize: 14,
         fontFamily: 'InterMedium',
         fontWeight: '500',
-        color: '#2869BD',
+        color: '#65758B',
     },
     itemsRow: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
-        gap: 12,
+        paddingHorizontal: 20,
+        gap: 8,
     },
     itemCard: {
         flex: 1,
@@ -353,32 +360,34 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     itemName: {
-        fontSize: 12,
-        fontFamily: 'InterMedium',
-        fontWeight: '500',
-        color: '#1E293B',
+        fontSize: 14,
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+        color: '#0F1729',
     },
     itemCategory: {
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: 'InterRegular',
-        color: '#94a3b8',
+        color: '#65758B',
         marginTop: 2,
     },
 
     // Create Button
     createBtn: {
-        marginHorizontal: 16,
+        marginHorizontal: 20,
         backgroundColor: '#2869BD',
-        borderRadius: 10,
+        borderRadius: 16,
         paddingVertical: 16,
         alignItems: 'center',
     },
     createBtnText: {
         fontSize: 16,
-        fontFamily: 'InterSemiBold',
-        fontWeight: '600',
+        fontFamily: 'InterBold',
+        fontWeight: '700',
         color: '#fff',
     },
+
+
 });
 
 export default HomeScreen;

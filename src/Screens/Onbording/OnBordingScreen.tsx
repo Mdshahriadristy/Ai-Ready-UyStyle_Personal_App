@@ -30,6 +30,7 @@ const STEPS = [
 
 type RootStackParamList = {
     onboarding: undefined
+    signin: undefined
     signup: undefined
     Home: undefined
 }
@@ -93,7 +94,7 @@ export default function OnBoardingScreen() {
                 {/* Already have account */}
                 <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => navigation.replace('signup')}
+                    onPress={() => navigation.replace('signin')}
                 >
                     <Text style={styles.loginText}>I Already Have An Account</Text>
                 </TouchableOpacity>
