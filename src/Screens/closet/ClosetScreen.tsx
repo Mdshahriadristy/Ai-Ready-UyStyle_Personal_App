@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     ScrollView,
     TouchableOpacity,
     Image,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Grid3x3, SlidersHorizontal, Search } from 'lucide-react-native';
+import { styles } from './style';
 
 const categories = ['All', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Shoes'];
 
@@ -43,60 +43,59 @@ const ClosetScreen = () => {
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+            {/* Header */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.title}>My Closet</Text>
+                    <Text style={styles.subtitle}>{filteredItems.length} items</Text>
+                </View>
+                <View style={styles.headerIcons}>
+                    <TouchableOpacity style={styles.iconBtn}>
+                        <Grid3x3 size={20} color="#1E293B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconBtn}>
+                        <SlidersHorizontal size={20} color="#1E293B" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Search */}
+            <View style={styles.searchWrapper}>
+                <Search size={16} color="#65758B" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Type something..."
+                    placeholderTextColor="#757575"
+                    value={searchText}
+                    onChangeText={setSearchText}
+                />
+            </View>
+
+            {/* Category Chips */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsRow}
+                style={styles.chipsScroll}
+            >
+                {categories.map(cat => (
+                    <TouchableOpacity
+                        key={cat}
+                        style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+                        onPress={() => setSelectedCategory(cat)}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
+                            {cat}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.title}>My Closet</Text>
-                        <Text style={styles.subtitle}>{filteredItems.length} items</Text>
-                    </View>
-                    <View style={styles.headerIcons}>
-                        <TouchableOpacity style={styles.iconBtn}>
-                            <Grid3x3 size={20} color="#1E293B" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.iconBtn}>
-                            <SlidersHorizontal size={20} color="#1E293B" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Search */}
-                <View style={styles.searchWrapper}>
-                    <Search size={16} color="#94a3b8" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Type something..."
-                        placeholderTextColor="#94a3b8"
-                        value={searchText}
-                        onChangeText={setSearchText}
-                    />
-                </View>
-
-                {/* Category Chips */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipsRow}
-                    style={styles.chipsScroll}
-                >
-                    {categories.map(cat => (
-                        <TouchableOpacity
-                            key={cat}
-                            style={[styles.chip, selectedCategory === cat && styles.chipActive]}
-                            onPress={() => setSelectedCategory(cat)}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
-                                {cat}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-
                 {/* Grid */}
                 <View style={styles.grid}>
                     {rows.map((row, rowIndex) => (
@@ -106,8 +105,10 @@ const ClosetScreen = () => {
                                     <View style={styles.imageWrapper}>
                                         <Image source={{ uri: item.image }} style={styles.itemImage} />
                                     </View>
-                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                    <Text style={styles.itemMeta}>{item.category} · {item.color}</Text>
+                                    <View style={styles.itemInfo}>
+                                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={styles.itemMeta}>{item.category} · {item.color}</Text>
+                                    </View>
                                 </TouchableOpacity>
                             ))}
                             {row.length === 1 && <View style={styles.card} />}
@@ -119,140 +120,5 @@ const ClosetScreen = () => {
         </SafeAreaView>
     );
 };
-
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    scroll: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: 100,
-    },
-
-    // Header
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 12,
-    },
-    title: {
-        fontSize: 22,
-        fontFamily: 'InterBold',
-        fontWeight: '700',
-        color: '#1E293B',
-    },
-    subtitle: {
-        fontSize: 12,
-        fontFamily: 'InterRegular',
-        color: '#94a3b8',
-        marginTop: 2,
-    },
-    headerIcons: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    iconBtn: {
-        width: 36,
-        height: 36,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 8,
-    },
-
-    // Search
-    searchWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginHorizontal: 16,
-        marginBottom: 12,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        height: 44,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    searchIcon: {
-        marginRight: 8,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        fontFamily: 'InterRegular',
-        color: '#1E293B',
-    },
-
-    // Chips
-    chipsScroll: {
-        marginBottom: 16,
-    },
-    chipsRow: {
-        paddingHorizontal: 16,
-        gap: 8,
-    },
-    chip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#F3F4F6',
-    },
-    chipActive: {
-        backgroundColor: '#2869BD',
-    },
-    chipText: {
-        fontSize: 13,
-        fontFamily: 'InterMedium',
-        fontWeight: '500',
-        color: '#64748B',
-    },
-    chipTextActive: {
-        color: '#fff',
-    },
-
-    // Grid
-    grid: {
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-    row: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    card: {
-        flex: 1,
-    },
-    imageWrapper: {
-        width: '100%',
-        aspectRatio: 1,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginBottom: 8,
-    },
-    itemImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    itemName: {
-        fontSize: 13,
-        fontFamily: 'InterSemiBold',
-        fontWeight: '600',
-        color: '#1E293B',
-        marginBottom: 2,
-    },
-    itemMeta: {
-        fontSize: 11,
-        fontFamily: 'InterRegular',
-        color: '#94a3b8',
-    },
-});
 
 export default ClosetScreen;

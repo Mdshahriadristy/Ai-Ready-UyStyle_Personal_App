@@ -56,7 +56,6 @@ const HomeScreen = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-
                 {/* Quick Fit Banner */}
                 <TouchableOpacity style={styles.quickFit} activeOpacity={0.8}>
                     <View style={styles.quickFitLeft}>
