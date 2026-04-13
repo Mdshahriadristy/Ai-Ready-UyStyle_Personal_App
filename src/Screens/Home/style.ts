@@ -9,7 +9,7 @@ export const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 100,
+        paddingBottom: 120,
         paddingTop: 15
     },
 
@@ -20,20 +20,31 @@ export const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 15,
         gap: 11,
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingTop: 15,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 11,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 11,
     },
     avatar: {
         width: 40,
         height: 40,
         borderRadius: 20,
     },
-    searchInput: {
-        flex: 1,
-        height: 36,
-        borderRadius: 8,
+    headerText: {
         fontSize: 14,
         fontFamily: 'InterRegular',
         fontWeight: '400',
         color: '#65758B',
+        width: 171,
     },
     headerIcon: {
         width: 40,

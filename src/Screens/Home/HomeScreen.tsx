@@ -5,7 +5,6 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
-    TextInput,
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,24 +32,28 @@ const HomeScreen = () => {
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             {/* Header */}
             <View style={styles.header}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
-                    style={styles.avatar}
-                />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="What are you wearing today?"
-                    placeholderTextColor="#94a3b8"
-                />
-                <TouchableOpacity style={styles.headerIcon}>
-                    <Search size={20} color="#0F1729" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.headerIcon}>
-                    <View style={styles.notifWrapper}>
-                        <Bell size={20} color="#1E293B" />
-                        <View style={styles.notifDot} />
-                    </View>
-                </TouchableOpacity>
+                <View style={styles.headerLeft}>
+                    <Image
+                        source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
+                        style={styles.avatar}
+                    />
+                    <Text
+                        style={styles.headerText}
+                    >
+                        What are you wearing today?
+                    </Text>
+                </View>
+                <View style={styles.headerRight}>
+                    <TouchableOpacity style={styles.headerIcon}>
+                        <Search size={20} color="#0F1729" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.headerIcon}>
+                        <View style={styles.notifWrapper}>
+                            <Bell size={20} color="#1E293B" />
+                            <View style={styles.notifDot} />
+                        </View>
+                    </TouchableOpacity>
+                </View>
             </View>
             <ScrollView
                 style={styles.scroll}

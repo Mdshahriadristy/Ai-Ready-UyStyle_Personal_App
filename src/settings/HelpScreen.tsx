@@ -49,8 +49,6 @@ const faqs = [
     },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 const SupportCard = ({ icon: Icon, title, sub, color }: any) => (
     <TouchableOpacity style={styles.supportCard} activeOpacity={0.7}>
         <View style={[styles.supportIconContainer, { backgroundColor: color + '15' }]}>

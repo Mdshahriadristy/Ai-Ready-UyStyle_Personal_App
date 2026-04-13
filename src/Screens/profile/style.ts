@@ -18,7 +18,7 @@ export const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 12,
+        paddingTop: 15,
         paddingBottom: 16,
     },
     profileLeft: {
