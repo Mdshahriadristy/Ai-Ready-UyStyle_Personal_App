@@ -63,7 +63,7 @@ const ProfileScreen = () => {
                 {/* Stats */}
                 <View style={styles.statsRow}>
                     {stats.map((stat) => (
-                        <View style={styles.statItem}>
+                        <View key={stat.label} style={styles.statItem}>
                             <Text style={styles.statValue}>{stat.value}</Text>
                             <Text style={styles.statLabel}>{stat.label}</Text>
                         </View>

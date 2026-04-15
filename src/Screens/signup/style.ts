@@ -20,7 +20,7 @@ export const styles = StyleSheet.create({
         height: 36,
     },
     header: {
-        marginTop: 8,
+        marginTop: 15,
         marginBottom: 32,
     },
     title: {
@@ -99,6 +99,21 @@ export const styles = StyleSheet.create({
         color: '#566166',
         textAlign: 'center',
         lineHeight: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    termsText2: {
+        fontSize: 12.5,
+        fontFamily: 'InterRegular',
+        fontWeight: '400',
+        color: '#566166',
+        textAlign: 'center',
+        lineHeight: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 285,
+        marginHorizontal: 'auto',
+        marginTop: 20,
     },
     termsLink: {
         color: '#1a1a2e',

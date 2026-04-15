@@ -1,4 +1,4 @@
-import { ChevronLeft, Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -35,13 +35,6 @@ const SignupScreen = ({ navigation }: any) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft color={'#000'} />
-          </TouchableOpacity>
 
           {/* Header */}
           <View style={styles.header}>
@@ -150,6 +143,9 @@ const SignupScreen = ({ navigation }: any) => {
               </Text>
             </TouchableOpacity>
             <Text style={styles.termsText}>
+              Already have an account? <Text style={styles.termsLink} onPress={() => navigation.navigate('signin')}>Sign In</Text>
+            </Text>
+            <Text style={styles.termsText2}>
               By creating an account, you agree to our{' '}
               <Text style={styles.termsLink}>Terms of Service</Text> and Privacy
               Policy.

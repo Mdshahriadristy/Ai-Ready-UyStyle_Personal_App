@@ -83,6 +83,16 @@ export const styles = StyleSheet.create({
         paddingHorizontal: 17,
         marginBottom: 12,
     },
+    primeryButton: {
+        backgroundColor: '#1E293B',
+    },
+    primeryButtonIcon: {
+        backgroundColor: '#2869BD',
+        borderRadius: 12,
+    },
+    primeryButtonText: {
+        color: '#fff',
+    },
     optionIcon: {
         width: 48,
         height: 48,

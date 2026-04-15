@@ -8,23 +8,18 @@ import {
     StatusBar,
     TextInput,
     LayoutAnimation,
-    Platform,
-    UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     ArrowLeft,
     Search,
     Mail,
-    Phone,
     ChevronDown,
     ChevronUp,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+
 
 const faqs = [
     {
@@ -54,8 +49,10 @@ const SupportCard = ({ icon: Icon, title, sub, color }: any) => (
         <View style={[styles.supportIconContainer, { backgroundColor: color + '15' }]}>
             <Icon size={24} color={color} />
         </View>
-        <Text style={styles.supportTitle}>{title}</Text>
-        <Text style={styles.supportSub}>{sub}</Text>
+        <View>
+            <Text style={styles.supportTitle}>{title}</Text>
+            <Text style={styles.supportSub}>{sub}</Text>
+        </View>
     </TouchableOpacity>
 );
 
@@ -102,12 +99,6 @@ const HelpScreen = () => {
                         title="Email"
                         sub="Within 24h"
                         color="#10B981"
-                    />
-                    <SupportCard
-                        icon={Phone}
-                        title="Call"
-                        sub="9am - 6pm"
-                        color="#F59E0B"
                     />
                 </View>
 
@@ -177,7 +168,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F1F5F9',
-        borderRadius: 16,
+        borderRadius: 12,
         paddingHorizontal: 16,
         height: 52,
     },
@@ -190,21 +181,20 @@ const styles = StyleSheet.create({
     },
     // Support Grid
     supportGrid: {
-        flexDirection: 'row',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         marginTop: 24,
         gap: 12,
     },
     supportCard: {
-        flex: 1,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 16,
+        flexDirection: 'row',
+        gap: 12,
         alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#F1F5F9',
-        // Shadow for iOS/Android
         elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -214,10 +204,10 @@ const styles = StyleSheet.create({
     supportIconContainer: {
         width: 48,
         height: 48,
-        borderRadius: 24,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        // marginBottom: 12,
     },
     supportTitle: {
         fontSize: 14,

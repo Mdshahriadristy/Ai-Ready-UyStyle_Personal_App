@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import OnBoardingScreen from '../Screens/Onbording/OnBordingScreen'
 import SignupScreen from '../Screens/signup/SignupScreen'
@@ -13,6 +13,7 @@ import NotificationScreen from '../settings/NotificationScreen'
 import AccountSettingsScreen from '../settings/AccountSettingsScreen'
 import PrivacyPolicyScreen from '../settings/PrivacyPolicyScreen'
 import HelpScreen from '../settings/HelpScreen'
+import SplashScreen from '../Screens/splash/Splashscreen'
 
 
 
@@ -20,6 +21,11 @@ const Stack = createNativeStackNavigator()
 
 
 export default function App() {
+    const [splashDone, setSplashDone] = useState(false)
+
+    if (!splashDone) {
+        return <SplashScreen onFinish={() => setSplashDone(true)} />
+    }
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="onboarding" component={OnBoardingScreen} />

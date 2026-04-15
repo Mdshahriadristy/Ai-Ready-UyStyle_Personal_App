@@ -8,7 +8,7 @@ import {
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronRight, Search, Zap } from 'lucide-react-native';
+import { Bell, ChevronRight, Search, Sparkles, Zap } from 'lucide-react-native';
 import { styles } from './style';
 import { useNavigation } from '@react-navigation/native';
 
@@ -64,14 +64,14 @@ const HomeScreen = () => {
                 <TouchableOpacity style={styles.quickFit} activeOpacity={0.8}>
                     <View style={styles.quickFitLeft}>
                         <View style={styles.quickFitIcon}>
-                            <Zap size={16} color="white" />
+                            <Zap size={16} color="#fff" />
                         </View>
                         <View>
                             <Text style={styles.quickFitTitle}>Quick Fit</Text>
-                            <Text style={styles.quickFitSub}>Generate an outfit instantly</Text>
+                            <Text style={styles.quickFitSub}>Generate an outfit instantly with AI</Text>
                         </View>
                     </View>
-                    <ChevronRight size={24} strokeWidth={2} color="#000" />
+                    <Sparkles size={20} color="#fff" />
                 </TouchableOpacity>
 
                 {/* Today's Pick Banner */}

@@ -47,18 +47,16 @@ const AdditemScreen = () => {
                     <Text style={styles.uploadSub}>Take a photo or choose from gallery</Text>
                 </TouchableOpacity>
 
-                {/* Divider */}
-
                 {/* Options */}
                 <TouchableOpacity
-                    style={styles.optionRow}
+                    style={[styles.optionRow, styles.primeryButton]}
                     onPress={handleTakePhoto}
                     activeOpacity={0.8}
                 >
-                    <View style={styles.optionIcon}>
+                    <View style={[styles.optionIcon, styles.primeryButtonIcon]}>
                         <Camera size={20} color="#fff" />
                     </View>
-                    <Text style={styles.optionText}>Take Photo</Text>
+                    <Text style={[styles.optionText, styles.primeryButtonText]}>Take Photo</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
