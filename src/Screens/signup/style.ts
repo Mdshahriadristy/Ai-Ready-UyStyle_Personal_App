@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         width: 285,
         marginHorizontal: 'auto',
-        marginTop: 20,
+
     },
     termsLink: {
         color: '#1a1a2e',
@@ -133,4 +133,25 @@ export const styles = StyleSheet.create({
         fontWeight: '500',
         fontFamily: 'InterMedium',
     },
+
+    // এই styles গুলো তোমার existing style.ts এ add করো
+
+alreadyAccountBanner: {
+  backgroundColor: '#EFF6FF',
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 16,
+  borderLeftWidth: 4,
+  borderLeftColor: '#2869BD',
+},
+alreadyAccountText: {
+  fontSize: 14,
+  color: '#1E40AF',
+  fontFamily: 'InterMedium',
+},
+alreadyAccountLink: {
+  fontWeight: '700',
+  textDecorationLine: 'underline',
+  color: '#1D4ED8',
+},
 });

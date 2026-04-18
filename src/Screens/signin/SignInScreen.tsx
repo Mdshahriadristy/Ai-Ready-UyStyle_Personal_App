@@ -1,127 +1,160 @@
+
+
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    StatusBar,
-    KeyboardAvoidingView,
-    ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StatusBar,
+  KeyboardAvoidingView,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles } from '../signup/style';
+import { getApp } from '@react-native-firebase/app';
+import { getAuth, signInWithEmailAndPassword } from '@react-native-firebase/auth';
 
 const EyeIcon = ({ visible }: { visible: boolean }) => (
-    <View>{visible ? <Eye color={'#717C82'} size={22} /> : <EyeOff color={'#717C82'} size={22} />}</View>
+  <View>
+    {visible
+      ? <Eye color={'#717C82'} size={22} />
+      : <EyeOff color={'#717C82'} size={22} />}
+  </View>
 );
 
 const SignInScreen = ({ navigation }: any) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail]           = useState('');
+  const [password, setPassword]     = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading]       = useState(false);
 
-    const handleBack = () => {
-        navigation?.goBack();
-    };
+  const handleSignIn = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
 
-    return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-            <KeyboardAvoidingView
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+    setLoading(true);
+    try {
+      const auth = getAuth(getApp());
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      // ✅ navigate() লাগবে না — onAuthStateChanged নিজেই AppStack-এ নিয়ে যাবে
+
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        Alert.alert('Error', 'No account found with this email');
+      } else if (error.code === 'auth/wrong-password') {
+        Alert.alert('Error', 'Incorrect password');
+      } else if (error.code === 'auth/invalid-email') {
+        Alert.alert('Error', 'Please enter a valid email address');
+      } else if (error.code === 'auth/invalid-credential') {
+        Alert.alert('Error', 'Invalid email or password');
+      } else {
+        Alert.alert('Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <KeyboardAvoidingView>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <ChevronLeft color={'#000'} />
+          </TouchableOpacity>
+
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to access your closet and saved outfits.</Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#b0b8c8"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={[styles.input, styles.inputWithIcon]}
+                  placeholder="••••••••"
+                  placeholderTextColor="#b0b8c8"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
                 >
-                    {/* Back Button */}
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={handleBack}
-                        activeOpacity={0.7}
-                    >
-                        <ChevronLeft color={'#000'} />
-                    </TouchableOpacity>
+                  <EyeIcon visible={showPassword} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
 
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Welcome back</Text>
-                        <Text style={styles.subtitle}>
-                            Sign in to access your closet and saved outfits.
-                        </Text>
-                    </View>
+          <View style={styles.spacer} />
 
-                    {/* Form */}
-                    <View style={styles.form}>
-
-                        {/* Email */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.label}>Email</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="you@example.com"
-                                    placeholderTextColor="#b0b8c8"
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Password */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.label}>Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={[styles.input, styles.inputWithIcon]}
-                                    placeholder="••••••••"
-                                    placeholderTextColor="#b0b8c8"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <TouchableOpacity
-                                    style={styles.eyeButton}
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    activeOpacity={0.7}
-                                >
-                                    <EyeIcon visible={showPassword} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Spacer */}
-                    <View style={styles.spacer} />
-
-                    {/* Footer */}
-                    <View style={[styles.footer, styles.signinfooter]}>
-                        <TouchableOpacity
-                            style={styles.nextButton}
-                            activeOpacity={0.85}
-                            onPress={() => navigation.navigate('bottombar')}
-                        >
-                            <Text style={styles.nextButtonText}>
-                                Sign In
-                            </Text>
-                        </TouchableOpacity>
-                        <Text style={styles.termsText}>
-                            Don't have an account? <Text style={styles.termsLink} onPress={() => navigation.navigate('signup')}>Sign Up</Text>
-                        </Text>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
+          <View style={[styles.footer, styles.signinfooter]}>
+            <TouchableOpacity
+              style={[styles.nextButton, loading && { opacity: 0.7 }]}
+              activeOpacity={0.85}
+              onPress={handleSignIn}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.nextButtonText}>Sign In</Text>
+              }
+            </TouchableOpacity>
+            <Text style={styles.termsText}>
+              Don't have an account?{' '}
+              <Text style={styles.termsLink} onPress={() => navigation.navigate('signup')}>
+                Sign Up
+              </Text>
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 };
-
-
 
 export default SignInScreen;
 
