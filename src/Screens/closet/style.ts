@@ -12,6 +12,7 @@ export const styles = StyleSheet.create({
         paddingBottom: 100,
     },
 
+    // ── Header ───────────────────────────────────────────
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -44,6 +45,8 @@ export const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
         borderRadius: 50,
     },
+
+    // ── Search ───────────────────────────────────────────
     searchWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -65,6 +68,7 @@ export const styles = StyleSheet.create({
         color: '#1E293B',
     },
 
+    // ── Category Chips ───────
     chipsScroll: {
         marginBottom: 16,
         maxHeight: 52,
@@ -94,6 +98,8 @@ export const styles = StyleSheet.create({
     chipTextActive: {
         color: '#fff',
     },
+
+
     grid: {
         paddingHorizontal: 20,
         gap: 12,
@@ -105,7 +111,6 @@ export const styles = StyleSheet.create({
     card: {
         flex: 1,
     },
-
     imageWrapper: {
         width: '100%',
         aspectRatio: 1,
@@ -116,6 +121,11 @@ export const styles = StyleSheet.create({
         borderBottomRightRadius: 0,
         overflow: 'hidden',
     },
+    itemImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
     itemInfo: {
         backgroundColor: '#F3F4F6',
         borderTopLeftRadius: 0,
@@ -123,11 +133,6 @@ export const styles = StyleSheet.create({
         borderBottomLeftRadius: 12,
         borderBottomRightRadius: 12,
         padding: 12,
-    },
-    itemImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
     },
     itemName: {
         fontSize: 13,
@@ -140,5 +145,49 @@ export const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: 'InterRegular',
         color: '#65758B',
+    },
+
+    // ── Loading ───────────────────────────────────────────
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+    },
+    loadingText: {
+        fontSize: 14,
+        fontFamily: 'InterRegular',
+        color: '#64748B',
+    },
+
+    // ── Empty State ───────────────────────────────────────
+    emptyWrapper: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingBottom: 80,
+        gap: 10,
+    },
+    emptyIconWrapper: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    emptyTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        fontFamily: 'InterSemiBold',
+        color: '#0F1729',
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        fontFamily: 'InterRegular',
+        color: '#94A3B8',
+        textAlign: 'center',
+        paddingHorizontal: 40,
     },
 });

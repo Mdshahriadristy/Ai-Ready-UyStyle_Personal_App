@@ -127,9 +127,7 @@
 // export default ProfileScreen;
 
 
-
-
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -138,26 +136,28 @@ import {
     Image,
     StatusBar,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, PenLine, Shirt } from 'lucide-react-native';
+import { ChevronRight, PenLine, Shirt, User } from 'lucide-react-native';
 import { styles } from './style';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { getApp } from '@react-native-firebase/app';
 import { getAuth, signOut } from '@react-native-firebase/auth';
+import { getFirestore, doc, getDoc } from '@react-native-firebase/firestore';
 
 const stats = [
-    { label: 'Items', value: '128' },
-    { label: 'Outfits', value: '24' },
-    { label: 'Favorites', value: '8' },
+    { label: 'Items',     value: '128' },
+    { label: 'Outfits',   value: '24'  },
+    { label: 'Favorites', value: '8'   },
 ];
 
 const menuItems = [
-    { label: 'Notifications', danger: false, screen: 'notification' },
+    { label: 'Notifications',    danger: false, screen: 'notification'    },
     { label: 'Account Settings', danger: false, screen: 'accountsettings' },
-    { label: 'Privacy', danger: false, screen: 'privacypolicy' },
-    { label: 'Help', danger: false, screen: 'help' },
-    { label: 'Logout', danger: true, screen: null },
+    { label: 'Privacy',          danger: false, screen: 'privacypolicy'   },
+    { label: 'Help',             danger: false, screen: 'help'            },
+    { label: 'Logout',           danger: true,  screen: null              },
 ];
 
 const favoriteLooks = [
@@ -168,8 +168,42 @@ const favoriteLooks = [
 const ProfileScreen = () => {
     const navigation = useNavigation<any>();
 
-    // ✅ Logout handler
-    const handleLogout = async () => {
+    // ── User data state ──────────────────────────────────
+    const [fullName,  setFullName]  = useState('');
+    const [photoURL,  setPhotoURL]  = useState<string | null>(null);
+    const [loading,   setLoading]   = useState(true);
+
+    const app  = getApp();
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    const user = auth.currentUser;
+
+    // ── Firestore থেকে profile fetch ─────────────────────
+    // useFocusEffect — ProfileEdit থেকে ফিরে আসলে auto re-fetch হবে
+    useFocusEffect(
+        useCallback(() => {
+            const fetchProfile = async () => {
+                if (!user) return;
+                setLoading(true);
+                try {
+                    const snap = await getDoc(doc(db, 'users', user.uid));
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        setFullName(data?.fullName  || '');
+                        setPhotoURL(data?.photoURL  || null);
+                    }
+                } catch (e) {
+                    console.log('Profile fetch error:', e);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchProfile();
+        }, [])
+    );
+
+    // ── Logout ────────────────────────────────────────────
+    const handleLogout = () => {
         Alert.alert(
             'Logout',
             'Are you sure you want to logout?',
@@ -181,7 +215,6 @@ const ProfileScreen = () => {
                     onPress: async () => {
                         try {
                             await signOut(getAuth(getApp()));
-                            // navigate() লাগবে না — user = null হলে AuthStack auto দেখাবে
                         } catch (error: any) {
                             Alert.alert('Error', error.message);
                         }
@@ -191,7 +224,7 @@ const ProfileScreen = () => {
         );
     };
 
-    // ✅ menu press handler — Logout হলে আলাদা function, বাকিগুলো navigate
+    // ── Menu press ────────────────────────────────────────
     const handleMenuPress = (item: { label: string; screen: string | null }) => {
         if (item.label === 'Logout') {
             handleLogout();
@@ -211,15 +244,32 @@ const ProfileScreen = () => {
                 {/* Profile Header */}
                 <View style={styles.profileHeader}>
                     <View style={styles.profileLeft}>
-                        <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
-                            style={styles.avatar}
-                        />
+
+                        {/* ✅ Avatar — Firestore photoURL দেখাবে */}
+                        {loading ? (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <ActivityIndicator size="small" color="#2869BD" />
+                            </View>
+                        ) : photoURL ? (
+                            <Image
+                                source={{ uri: photoURL }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <User size={22} color="#94A3B8" />
+                            </View>
+                        )}
+
                         <View>
-                            <Text style={styles.profileName}>Hi, Sarah</Text>
+                            {/* ✅ Name — Firestore fullName দেখাবে */}
+                            <Text style={styles.profileName}>
+                                Hi, {loading ? '...' : fullName || 'User'}
+                            </Text>
                             <Text style={styles.profileSub}>Inspiration for today</Text>
                         </View>
                     </View>
+
                     <TouchableOpacity
                         onPress={() => navigation.navigate('profileedit')}
                         style={styles.editBtn}
@@ -282,7 +332,7 @@ const ProfileScreen = () => {
                             key={item.label}
                             style={styles.menuRow}
                             activeOpacity={0.7}
-                            onPress={() => handleMenuPress(item)} 
+                            onPress={() => handleMenuPress(item)}
                         >
                             <Text style={[styles.menuLabel, item.danger && styles.menuLabelDanger]}>
                                 {item.label}

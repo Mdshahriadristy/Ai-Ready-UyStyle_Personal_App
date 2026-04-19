@@ -191,4 +191,9 @@ export const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#E2E8F0',
     },
+avatarPlaceholder: {
+    backgroundColor: '#E2E8F0',
+    justifyContent:  'center',
+    alignItems:      'center',
+},
 });
