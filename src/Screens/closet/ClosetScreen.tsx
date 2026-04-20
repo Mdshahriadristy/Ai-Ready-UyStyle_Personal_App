@@ -212,7 +212,7 @@ const ClosetScreen = () => {
 
         const search = searchText.toLowerCase().trim();
 
-        // ✅ ?? '' দিয়ে null/undefined safe করা হয়েছে
+
         const matchSearch =
             !search ||
             (item.title    ?? '').toLowerCase().includes(search) ||
