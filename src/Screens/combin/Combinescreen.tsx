@@ -133,8 +133,7 @@ const CombineScreen = ({ navigation }: any) => {
     );
 
     // ── Firebase: closet items ───────────────────────────────────────────────
-    // FIX: Removed orderBy('createdAt') — sorting client-side to avoid
-    //      requiring a Firestore composite index on (userId + createdAt).
+
     useEffect(() => {
         if (!user) return;
         const q = query(
@@ -571,7 +570,11 @@ const CombineScreen = ({ navigation }: any) => {
 
                 <TouchableOpacity
                     style={[s.saveBtn, (saving || selectedCount === 0) && s.saveBtnOff]}
-                    onPress={handleSaveLook}
+                                       onPress={() =>
+                        navigation.navigate('saveSuccess', {
+                            items: Object.values(slotMap).filter(Boolean) as ClosetItem[],
+                        })
+                    }
                     disabled={saving || selectedCount === 0}
                     activeOpacity={0.85}
                 >

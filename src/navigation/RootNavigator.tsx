@@ -67,6 +67,7 @@ import NotificationScreen    from '../settings/NotificationScreen';
 import AccountSettingsScreen from '../settings/AccountSettingsScreen';
 import PrivacyPolicyScreen   from '../settings/PrivacyPolicyScreen';
 import HelpScreen            from '../settings/HelpScreen';
+import ChangePasswordScreen from '../Screens/profile/Changepassword/ChangePasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -83,6 +84,8 @@ const AppStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="bottombar"       component={BottomBar} />
     <Stack.Screen name="profileedit"     component={ProfileEditScreen} />
+    <Stack.Screen name="ChangePassword"     component={ChangePasswordScreen} />
+
     <Stack.Screen name="preference"      component={StylePreferenceScreen} />
     <Stack.Screen name="combine"         component={CombineScreen} />
     <Stack.Screen name="preview"         component={PreviewScreen} />

@@ -420,7 +420,7 @@ const ProfileEditScreen = ({ navigation }: any) => {
 
         setSaving(true);
         try {
-            // Step 1: image থাকলে upload
+           
             const photoURL = imageFile
                 ? await uploadImage(user.uid)
                 : (avatarUrl || '');
@@ -445,7 +445,7 @@ const ProfileEditScreen = ({ navigation }: any) => {
         }
     };
 
-    // ── Loading Screen ────────────────────────────────────
+    // ── Loading Screen ─────
     if (loading) {
         return (
             <View style={styles.centered}>

@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-
+const H_PAD       = 16;
 export const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
         paddingBottom: 100,
     },
 
-    // ── Header ───────────────────────────────────────────
+    // ── Header 
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
         borderRadius: 50,
     },
 
-    // ── Search ───────────────────────────────────────────
+    // ── Search 
     searchWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -68,22 +68,25 @@ export const styles = StyleSheet.create({
         color: '#1E293B',
     },
 
-    // ── Category Chips ───────
+    // ─── Category tabs 
+    
     chipsScroll: {
-        marginBottom: 16,
-        maxHeight: 52,
+        flexGrow: 0,
+        marginBottom: 14,
     },
     chipsRow: {
-        paddingHorizontal: 20,
+     paddingHorizontal: H_PAD,
+        paddingVertical: 2,
+        flexDirection: 'row',
         gap: 8,
         alignItems: 'center',
     },
     chip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 12,
+        height: 36,                  
+        paddingHorizontal: 18,         
+        borderRadius: 18,
         backgroundColor: '#F3F4F6',
-        height: 36,
+        alignItems: 'center',
         justifyContent: 'center',
     },
     chipActive: {
@@ -94,6 +97,7 @@ export const styles = StyleSheet.create({
         fontFamily: 'InterSemiBold',
         fontWeight: '600',
         color: '#65758B',
+        includeFontPadding: false,     
     },
     chipTextActive: {
         color: '#fff',
@@ -101,7 +105,7 @@ export const styles = StyleSheet.create({
 
 
     grid: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         gap: 12,
     },
     row: {
@@ -147,7 +151,7 @@ export const styles = StyleSheet.create({
         color: '#65758B',
     },
 
-    // ── Loading ───────────────────────────────────────────
+    // ── Loading 
     centered: {
         flex: 1,
         justifyContent: 'center',
@@ -160,7 +164,7 @@ export const styles = StyleSheet.create({
         color: '#64748B',
     },
 
-    // ── Empty State ───────────────────────────────────────
+    // ── Empty State 
     emptyWrapper: {
         flex: 1,
         justifyContent: 'center',

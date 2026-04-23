@@ -192,7 +192,7 @@ export type ClosetItem = {
     likeCount: number;
 };
 
-// ─── HeartButton ──────────────────────────────────────────────────────────────
+
 interface HeartButtonProps {
     itemId:   string;
     liked:    boolean;
@@ -229,7 +229,7 @@ const HeartButton: React.FC<HeartButtonProps> = ({ itemId, liked, onToggle }) =>
     );
 };
 
-// ─── ItemCard ─────────────────────────────────────────────────────────────────
+// ─── ItemCard ─────
 interface ItemCardProps {
     item:     ClosetItem;
     liked:    boolean;
@@ -331,7 +331,7 @@ const ClosetScreen = () => {
         return () => unsub();
     }, [user]);
 
-    // ── 3. Dynamic categories — extracted from live items, never hardcoded ────
+
     const categoryTabs = useMemo(() => {
         const unique = Array.from(
             new Set(items.map(i => i.category).filter(Boolean)),
@@ -339,14 +339,14 @@ const ClosetScreen = () => {
         return ['All', ...unique];
     }, [items]);
 
-    // If current tab disappears (item deleted), fall back to 'All'
+
     useEffect(() => {
         if (selectedCategory !== 'All' && !categoryTabs.includes(selectedCategory)) {
             setSelectedCategory('All');
         }
     }, [categoryTabs]);
 
-    // ── 4. Client-side filter ─────────────────────────────────────────────────
+    // ── 4. Client-side filter 
     const filteredItems = useMemo(() =>
         items.filter(item => {
             const matchCat    = selectedCategory === 'All' || item.category === selectedCategory;
@@ -368,7 +368,7 @@ const ClosetScreen = () => {
 
     const handleRefresh  = useCallback(() => setPageSize(PAGE_SIZE), []);
 
-    // ── 6. Like / Unlike ──────────────────────────────────────────────────────
+    // ── 6. Like / Unlike 
     const handleToggleLike = useCallback(async (itemId: string) => {
         if (!user) return;
         const isLiked = likedIds.has(itemId);
@@ -406,7 +406,7 @@ const ClosetScreen = () => {
         }
     }, [user, likedIds, db]);
 
-    // ── Render helpers ────────────────────────────────────────────────────────
+    // ── Render helpers
     const renderItem = useCallback(
         ({ item }: { item: ClosetItem }) => (
             <ItemCard item={item} liked={likedIds.has(item.id)} onToggle={handleToggleLike} />
@@ -546,7 +546,7 @@ const ClosetScreen = () => {
 
 export default ClosetScreen;
 
-// ─── Local styles ─────────────────────────────────────────────────────────────
+// ─── Local styles 
 const cardStyles = StyleSheet.create({
     card: {
         width:           CARD_WIDTH,

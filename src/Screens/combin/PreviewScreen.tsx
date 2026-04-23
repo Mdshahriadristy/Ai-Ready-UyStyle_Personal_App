@@ -286,15 +286,9 @@ type SlotMeta = {
 };
 
 // Default slots mirror CombineScreen
-const DEFAULT_SLOTS: SlotMeta[] = [
-    { id: 'Top',       label: 'Top',       isDefault: true },
-    { id: 'Bottom',    label: 'Bottom',    isDefault: true },
-    { id: 'Shoes',     label: 'Shoes',     isDefault: true },
-    { id: 'Outerwear', label: 'Outerwear', isDefault: true },
-    { id: 'Accessory', label: 'Accessory', isDefault: true },
-];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+
+// ─── Component ─────
 
 const PreviewScreen = ({ route, navigation }: any) => {
 
@@ -306,7 +300,7 @@ const PreviewScreen = ({ route, navigation }: any) => {
     const db   = getFirestore(app);
     const user = auth.currentUser;
 
-    const [allSlots, setAllSlots]   = useState<SlotMeta[]>(DEFAULT_SLOTS);
+ 
     const [loadingSlots, setLoadingSlots] = useState(true);
 
     // ── Fetch custom slots from Firebase ────────────────────────────────────
@@ -324,7 +318,7 @@ const PreviewScreen = ({ route, navigation }: any) => {
                     label:     (d.data() as any).label,
                     isDefault: false,
                 }));
-                setAllSlots([...DEFAULT_SLOTS, ...custom]);
+               
             } catch (e) {
                 console.warn(e);
             } finally {
@@ -337,8 +331,8 @@ const PreviewScreen = ({ route, navigation }: any) => {
     // ── Resolve slot label for an item ───────────────────────────────────────
     const resolveSlotLabel = (item: ClosetItem): string => {
         const cat = (item.category ?? '').toLowerCase().trim();
-        const exact = allSlots.find(s => s.label.toLowerCase() === cat);
-        if (exact) return exact.label;
+    
+       
         if (/top|shirt|sweater|blouse|tee|knit/.test(cat))    return 'Top';
         if (/bottom|jean|trouser|pant|skirt|short/.test(cat)) return 'Bottom';
         if (/shoe|sneaker|boot|loafer|heel|sandal/.test(cat)) return 'Shoes';
@@ -347,11 +341,11 @@ const PreviewScreen = ({ route, navigation }: any) => {
     };
 
     // ── Layout helpers ───────────────────────────────────────────────────────
-    // First item = large hero, rest = 2-column grid
+
     const heroItem  = items[0] ?? null;
     const gridItems = items.slice(1);
 
-    const GRID_ITEM_W = (width - H_PAD * 2 - 32 - 10) / 2; // card padding + gap
+    const GRID_ITEM_W = (width - H_PAD * 2 - 32 - 10) / 2; 
 
     if (loadingSlots) {
         return (
@@ -477,7 +471,7 @@ const PreviewScreen = ({ route, navigation }: any) => {
             <View style={st.bottomBar}>
                 <TouchableOpacity
                     style={st.backOutfitBtn}
-                    onPress={() => navigation.goBack()}
+                       onPress={() => navigation.navigate('combine')}
                     activeOpacity={0.8}
                 >
                     <Text style={st.backOutfitTxt}>Edit Outfit</Text>
@@ -485,7 +479,8 @@ const PreviewScreen = ({ route, navigation }: any) => {
 
                 <TouchableOpacity
                     style={st.confirmBtn}
-                    onPress={() => navigation.navigate('bottombar')}
+                 
+                       onPress={() => navigation.goBack()}
                     activeOpacity={0.85}
                 >
                     <Text style={st.confirmTxt}>Confirm Look</Text>
