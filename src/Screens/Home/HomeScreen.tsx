@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 const HomeScreen = () => {
     const [activeTab, setActiveTab] = useState<'wear' | 'build'>('wear');
     const navigation = useNavigation<any>();
+
     const recentItems = [
         { id: 1, name: 'White Oversiz...', category: 'Top', image: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200' },
         { id: 2, name: 'Blue Straight J...', category: 'Bottom', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=200' },
@@ -30,6 +31,7 @@ const HomeScreen = () => {
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+            
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
@@ -37,11 +39,7 @@ const HomeScreen = () => {
                         source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
                         style={styles.avatar}
                     />
-                    <Text
-                        style={styles.headerText}
-                    >
-                        What are you wearing today?
-                    </Text>
+                    <Text style={styles.headerText}>What are you wearing today?</Text>
                 </View>
                 <View style={styles.headerRight}>
                     <TouchableOpacity style={styles.headerIcon}>
@@ -55,13 +53,18 @@ const HomeScreen = () => {
                     </TouchableOpacity>
                 </View>
             </View>
+
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Quick Fit Banner */}
-                <TouchableOpacity style={styles.quickFit} activeOpacity={0.8}>
+                {/* --- Quick Fit Banner (Navigation Updated Here) --- */}
+                <TouchableOpacity 
+                    style={styles.quickFit} 
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('AIChatScreen')} // এখানে আপনার চ্যাট স্ক্রিনের নাম দিন
+                >
                     <View style={styles.quickFitLeft}>
                         <View style={styles.quickFitIcon}>
                             <Zap size={16} color="#fff" />
@@ -148,7 +151,9 @@ const HomeScreen = () => {
                 </View>
 
                 {/* Create Your Own */}
-                <TouchableOpacity style={styles.createBtn} activeOpacity={0.85}
+                <TouchableOpacity 
+                    style={styles.createBtn} 
+                    activeOpacity={0.85}
                     onPress={() => navigation.navigate('combine')}
                 >
                     <Text style={styles.createBtnText}>Create Your Own</Text>
@@ -158,7 +163,5 @@ const HomeScreen = () => {
         </SafeAreaView>
     );
 };
-
-
 
 export default HomeScreen;

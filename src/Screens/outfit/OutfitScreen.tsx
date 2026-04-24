@@ -8,7 +8,6 @@ import {
     StatusBar,
     Animated,
     FlatList,
-    Dimensions,
     Alert,
     ActivityIndicator,
     TouchableWithoutFeedback,
@@ -34,261 +33,142 @@ import {
 } from '@react-native-firebase/firestore';
 import { styles } from './style';
 
-
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PAD      = 16;
-const CARD_GAP   = 12;
-const CARD_WIDTH  = (SCREEN_WIDTH - H_PAD * 2 - CARD_GAP) / 2;
-const CARD_HEIGHT = CARD_WIDTH * 1;
-const INFO_HEIGHT = 52;
-const PAGE_SIZE   = 10;
-
-
-
-type ClosetItem = {
-    id:        string;
-    title:     string;
-    category:  string;
-    color:     string;
-    imageURL:  string;
-    userId:    string;
+// --- Types ---
+type OutfitItem = {
+    id: string;
+    title: string;
+    category: string;
+    color: string;
+    imageURL: string;
+    userId: string;
     createdAt?: any;
 };
 
-interface OutfitCardProps {
-    item:        ClosetItem;
-    isActive:    boolean;
-    onCardPress: (id: string) => void;
-    onDelete:    (item: ClosetItem) => void;
-    onOutfitPress?: (item: ClosetItem) => void;
-}
+const PAGE_SIZE = 10;
 
-interface CategoryTabProps {
-    label:    string;
-    isActive: boolean;
-    onPress:  () => void;
-}
+// --- Helper: Firestore Data Mapper ---
 
-interface EmptyStateProps {
-    category: string;
-}
+const mapFirestoreDoc = (d: QueryDocumentSnapshot<DocumentData>): OutfitItem => {
+    const data = d.data();
+    const itemDetails = data.itemDetails || {};
+    const firstKey = Object.keys(itemDetails)[0];
+    const details = itemDetails[firstKey] || {};
 
-interface ErrorStateProps {
-    onRetry: () => void;
-}
+    return {
+        id: d.id,
+        userId: data.userId,
+        createdAt: data.createdAt,
+        title: details.title || 'Untitled',
+        category: details.category || 'Uncategorized',
+        color: details.color || '',
+        imageURL: details.imageURL || '', 
+    };
+};
 
-interface OutfitScreenProps {
-    onOutfitPress?: (item: ClosetItem) => void;
-}
+// --- Sub-Components ---
 
-// ─── Skeleton Card ────────────────────────────────────────────────────────────
-
-const SkeletonCard: React.FC = () => {
-    const shimmer = useRef(new Animated.Value(0)).current;
-
+const SkeletonCard = () => {
+    const shimmer = useRef(new Animated.Value(0.4)).current;
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
-                Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
-                Animated.timing(shimmer, { toValue: 0, duration: 900, useNativeDriver: true }),
+                Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: true }),
+                Animated.timing(shimmer, { toValue: 0.4, duration: 800, useNativeDriver: true }),
             ])
         ).start();
-    }, [shimmer]);
-
-    const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.75] });
+    }, []);
 
     return (
-        <Animated.View style={[styles.skeletonCard, { opacity }]}>
+        <Animated.View style={[styles.skeletonCard, { opacity: shimmer }]}>
             <View style={styles.skeletonImage} />
             <View style={styles.skeletonTextBlock}>
                 <View style={styles.skeletonLine} />
-                <View style={[styles.skeletonLine, { width: '55%' }]} />
+                <View style={[styles.skeletonLine, { width: '60%' }]} />
             </View>
         </Animated.View>
     );
 };
 
-// ─── Outfit Card ──────────────────────────────────────────────────────────────
-// Tap card → X icon appears. Tap X → confirmation popup. Tap elsewhere → deactivate.
+const OutfitCard = React.memo(({ item, isActive, onCardPress, onDelete, onOutfitPress }: any) => {
+    const xScale = useRef(new Animated.Value(0)).current;
 
-const OutfitCard: React.FC<OutfitCardProps> = React.memo(
-    ({ item, isActive, onCardPress, onDelete, onOutfitPress }) => {
+    useEffect(() => {
+        Animated.spring(xScale, {
+            toValue: isActive ? 1 : 0,
+            useNativeDriver: true,
+            friction: 8,
+        }).start();
+    }, [isActive]);
 
-        // Animate the X badge scale in/out
-        const xScale = useRef(new Animated.Value(0)).current;
-
-        useEffect(() => {
-            Animated.spring(xScale, {
-                toValue:       isActive ? 1 : 0,
-                useNativeDriver: true,
-                speed:          30,
-                bounciness:     8,
-            }).start();
-        }, [isActive]);
-
-        return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => {
-                    if (isActive) {
-
-                        onOutfitPress?.(item);
-                    } else {
-                        onCardPress(item.id);
-                    }
-                }}
-                onLongPress={() => onCardPress(item.id)}
-                delayLongPress={300}
-            >
-                <View style={[styles.card, isActive && styles.cardActive]}>
-                    {/* Image */}
-                    <View style={styles.imageWrapper}>
-                        {item.imageURL ? (
-                            <Image
-                                source={{ uri: item.imageURL }}
-                                style={styles.itemImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <View style={styles.imageFallback}>
-                                <Text style={styles.imageFallbackText}>
-                                    {item.title?.charAt(0) ?? '?'}
-                                </Text>
-                            </View>
-                        )}
-
-                        {/* ── X delete badge — hidden by default, shown when active ── */}
-                        <Animated.View
-                            style={[
-                                styles.deleteBadge,
-                                { transform: [{ scale: xScale }] },
-                                // pointer-events off when invisible so it doesn't block taps
-                                !isActive && { pointerEvents: 'none' },
-                            ]}
-                        >
-                            <TouchableOpacity
-                                style={styles.deleteBadgeInner}
-                                onPress={() => onDelete(item)}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                activeOpacity={0.8}
-                            >
-                                <X size={11} color="#fff" strokeWidth={3} />
-                            </TouchableOpacity>
-                        </Animated.View>
-                    </View>
-
-                    {/* Info */}
-                    <View style={styles.itemInfo}>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                            {item.title}
-                        </Text>
-                        <Text style={styles.itemMeta} numberOfLines={1}>
-                            {[item.category, item.color].filter(Boolean).join(' · ')}
-                        </Text>
-                    </View>
+    return (
+        <TouchableOpacity 
+            activeOpacity={0.9} 
+            onPress={() => isActive ? onOutfitPress?.(item) : onCardPress(item.id)}
+            
+        >
+            <View style={[styles.card, isActive && styles.cardActive]}>
+                <View style={styles.imageWrapper}>
+                    {item.imageURL ? (
+                        <Image source={{ uri: item.imageURL }} style={styles.itemImage} resizeMode="cover" />
+                    ) : (
+                        <View style={styles.imageFallback}><Text>{item.title[0]}</Text></View>
+                    )}
+                    
+                    <Animated.View style={[styles.deleteBadge, { transform: [{ scale: xScale }] }]}>
+                        <TouchableOpacity style={styles.deleteBadgeInner} onPress={() => onDelete(item)}>
+                            <X size={12} color="#fff" strokeWidth={3} />
+                        </TouchableOpacity>
+                    </Animated.View>
                 </View>
-            </TouchableOpacity>
-        );
-    }
-);
-
-// ─── Category Tab ──────
-
-const CategoryTab: React.FC<CategoryTabProps> = React.memo(({ label, isActive, onPress }) => (
-    <TouchableOpacity
-        style={[styles.chip, isActive && styles.chipActive]}
-        onPress={onPress}
-        activeOpacity={0.75}
-    >
-        <Text style={[styles.chipText, isActive && styles.chipTextActive]} numberOfLines={1}>
-            {label}
-        </Text>
-    </TouchableOpacity>
-));
-
-// ─── Empty State ──────────────────────────────────────────────────────────────
-
-const EmptyState: React.FC<EmptyStateProps> = ({ category }) => (
-    <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>👗</Text>
-        <Text style={styles.emptyTitle}>No items here yet</Text>
-        <Text style={styles.emptySubtitle}>
-            {category === 'All'
-                ? 'Your wardrobe is empty. Start adding clothes!'
-                : `No items found in "${category}".`}
-        </Text>
-    </View>
-);
-
-// ─── Error State ──────────────────────────────────────────────────────────────
-
-const ErrorState: React.FC<ErrorStateProps> = ({ onRetry }) => (
-    <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>Couldn't load items</Text>
-        <Text style={styles.emptySubtitle}>Check your connection and try again.</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={onRetry}>
-            <Text style={styles.retryBtnText}>Retry</Text>
+                <View style={styles.itemInfo}>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.itemMeta} numberOfLines={1}>{item.category} • {item.color}</Text>
+                </View>
+            </View>
         </TouchableOpacity>
-    </View>
-);
+    );
+});
 
-// ─── Main Screen ───
+// --- Main Screen ---
 
-const OutfitScreen: React.FC<OutfitScreenProps> = ({ onOutfitPress }) => {
+const OutfitScreen: React.FC<{ onOutfitPress?: (item: OutfitItem) => void }> = ({ onOutfitPress }) => {
+    const db = getFirestore(getApp());
+    const user = getAuth().currentUser;
 
-    const app  = getApp();
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    const user = auth.currentUser;
-
-    const [items, setItems]                       = useState<ClosetItem[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
-    const [loading, setLoading]                   = useState<boolean>(true);
-    const [loadingMore, setLoadingMore]           = useState<boolean>(false);
-    const [hasMore, setHasMore]                   = useState<boolean>(false);
-    const [error, setError]                       = useState<Error | null>(null);
-    const [activeCardId, setActiveCardId]         = useState<string | null>(null);
-    const [deletingId, setDeletingId]             = useState<string | null>(null);
+    const [items, setItems] = useState<OutfitItem[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+    const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
     const unsubscribeRef = useRef<(() => void) | null>(null);
-    // Cursor for pagination: last Firestore document of the current page
     const lastDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
 
-    // ── Page 1 — real-time snapshot, first PAGE_SIZE items ───────────────────
+    // Initial Fetch (Real-time)
     const subscribe = useCallback(() => {
         if (!user) return;
-
         setLoading(true);
         setError(null);
-        setItems([]);
-        lastDocRef.current = null;
 
         const q = query(
-            collection(db, 'closetItems'),
+            collection(db, 'outfits'),
             where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc'),   
-            limit(PAGE_SIZE),
+            orderBy('createdAt', 'desc'),
+            limit(PAGE_SIZE)
         );
 
-        unsubscribeRef.current = onSnapshot(
-            q,
-            snapshot => {
-                const docs: ClosetItem[] = snapshot.docs.map(d => ({
-                    id: d.id,
-                    ...(d.data() as Omit<ClosetItem, 'id'>),
-                }));
-                setItems(docs);
-                lastDocRef.current = snapshot.docs[snapshot.docs.length - 1] ?? null;
-                setHasMore(snapshot.docs.length === PAGE_SIZE);
-                setLoading(false);
-            },
-            (err: Error) => {
-                console.warn('[Firestore] closetItems error:', err);
-                setError(err);
-                setLoading(false);
-            }
-        );
+        unsubscribeRef.current = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(mapFirestoreDoc);
+            setItems(docs);
+            lastDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
+            setHasMore(snapshot.docs.length === PAGE_SIZE);
+            setLoading(false);
+        }, (err) => {
+            setError(err);
+            setLoading(false);
+        });
     }, [user?.uid]);
 
     useEffect(() => {
@@ -296,198 +176,91 @@ const OutfitScreen: React.FC<OutfitScreenProps> = ({ onOutfitPress }) => {
         return () => unsubscribeRef.current?.();
     }, [subscribe]);
 
-  
-    const loadMore = useCallback(async () => {
+    // Pagination
+    const loadMore = async () => {
         if (!user || !hasMore || loadingMore || !lastDocRef.current) return;
-
+        setLoadingMore(true);
         try {
-            setLoadingMore(true);
             const q = query(
-                collection(db, 'closetItems'),
+                collection(db, 'outfits'),
                 where('userId', '==', user.uid),
                 orderBy('createdAt', 'desc'),
                 startAfter(lastDocRef.current),
-                limit(PAGE_SIZE),
+                limit(PAGE_SIZE)
             );
             const snapshot = await getDocs(q);
-            const newDocs: ClosetItem[] = snapshot.docs.map(d => ({
-                id: d.id,
-                ...(d.data() as Omit<ClosetItem, 'id'>),
-            }));
+            const newDocs = snapshot.docs.map(mapFirestoreDoc);
             setItems(prev => [...prev, ...newDocs]);
-            lastDocRef.current = snapshot.docs[snapshot.docs.length - 1] ?? null;
+            lastDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
             setHasMore(snapshot.docs.length === PAGE_SIZE);
         } catch (err) {
-            console.warn('[Firestore] loadMore error:', err);
+            console.warn(err);
         } finally {
             setLoadingMore(false);
         }
-    }, [user?.uid, hasMore, loadingMore]);
+    };
 
-    // ── Delete item from Firestore ────────────────────────────────────────────
-    const handleDelete = useCallback((item: ClosetItem) => {
-        Alert.alert(
-            'Delete Item',
-            `Remove "${item.title}" from your wardrobe?`,
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => setActiveCardId(null),
-                },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setDeletingId(item.id);
-                            setActiveCardId(null);
-                            await deleteDoc(doc(db, 'closetItems', item.id));
-                            // Optimistic removal from local state
-                            setItems(prev => prev.filter(i => i.id !== item.id));
-                        } catch (err) {
-                            console.warn('[Firestore] delete error:', err);
-                            Alert.alert('Error', 'Could not delete item. Please try again.');
-                        } finally {
-                            setDeletingId(null);
-                        }
-                    },
-                },
-            ],
-        );
-    }, []);
+    const handleDelete = (item: OutfitItem) => {
+        Alert.alert('Delete', `Remove ${item.title}?`, [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+                text: 'Delete', 
+                style: 'destructive', 
+                onPress: async () => {
+                    await deleteDoc(doc(db, 'outfits', item.id));
+                    setItems(prev => prev.filter(i => i.id !== item.id));
+                } 
+            }
+        ]);
+    };
 
-    // ── Card activation toggle ────────────────────────────────────────────────
-    const handleCardPress = useCallback((id: string) => {
-        setActiveCardId(prev => (prev === id ? null : id));
-    }, []);
+    // Filter Logic
+    const categories = useMemo(() => ['All', ...new Set(items.map(i => i.category))].sort(), [items]);
+    const filteredItems = useMemo(() => selectedCategory === 'All' ? items : items.filter(i => i.category === selectedCategory), [items, selectedCategory]);
 
-    // Dismiss active card when tapping outside the grid
-    const dismissActive = useCallback(() => {
-        if (activeCardId) setActiveCardId(null);
-    }, [activeCardId]);
-
-    // ── Derived: categories ───────────────────────────────────────────────────
-    const categories = useMemo<string[]>(() => {
-        const unique = [
-            ...new Set(
-                items
-                    .map(o => o.category)
-                    .filter((c): c is string => Boolean(c))
-            ),
-        ].sort();
-        return ['All', ...unique];
-    }, [items]);
-
-    // ── Derived: filtered list ────────────────────────────────────────────────
-    const filteredItems = useMemo<ClosetItem[]>(() => {
-        if (selectedCategory === 'All') return items;
-        return items.filter(o => o.category === selectedCategory);
-    }, [items, selectedCategory]);
-
-
-    useEffect(() => {
-        if (selectedCategory !== 'All' && !categories.includes(selectedCategory)) {
-            setSelectedCategory('All');
-        }
-    }, [categories, selectedCategory]);
-
-    // ── FlatList helpers ───
-    const renderItem = useCallback(
-        ({ item }: { item: ClosetItem }) => (
-            <OutfitCard
-                item={item}
-                isActive={activeCardId === item.id}
-                onCardPress={handleCardPress}
-                onDelete={handleDelete}
-                onOutfitPress={onOutfitPress}
-            />
-        ),
-        [activeCardId, handleCardPress, handleDelete, onOutfitPress]
-    );
-
-    const keyExtractor = useCallback((item: ClosetItem) => item.id, []);
-
-    const ROW_H = CARD_HEIGHT + INFO_HEIGHT + CARD_GAP;
-
-    const ListFooter = () => (
-        <View style={styles.listFooter}>
-            {loadingMore && <ActivityIndicator size="small" color="#2869BD" />}
-        </View>
-    );
-
-    // ── Render ────────────────
     return (
-        <TouchableWithoutFeedback onPress={dismissActive}>
+        <TouchableWithoutFeedback onPress={() => setActiveCardId(null)}>
             <SafeAreaView style={styles.safeArea}>
-                <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
-                {/* Header */}
+                <StatusBar barStyle="dark-content" />
                 <View style={styles.header}>
                     <Text style={styles.title}>Saved Outfits</Text>
-                    <Text style={styles.subtitle}>
-                        {loading
-                            ? 'Loading…'
-                            : `${filteredItems.length}${hasMore ? '+' : ''} ${filteredItems.length === 1 ? 'item' : 'items'}`}
-                    </Text>
+                    <Text style={styles.subtitle}>{filteredItems.length} items found</Text>
                 </View>
 
-                {/* Category tabs */}
-                {!loading && !error && (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.chipsRow}
-                        style={styles.chipsScroll}
-                    >
-                        {categories.map(cat => (
-                            <CategoryTab
-                                key={cat}
-                                label={cat}
-                                isActive={selectedCategory === cat}
-                                onPress={() => {
-                                    setActiveCardId(null);
-                                    setSelectedCategory(cat);
-                                }}
-                            />
-                        ))}
-                    </ScrollView>
-                )}
+                {/* Category Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll} contentContainerStyle={styles.chipsRow}>
+                    {categories.map(cat => (
+                        <TouchableOpacity 
+                            key={cat} 
+                            style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+                            onPress={() => setSelectedCategory(cat)}
+                        >
+                            <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>{cat}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
 
-                {/* Content */}
                 {loading ? (
-                    <View style={styles.skeletonGrid}>
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <SkeletonCard key={i} />
-                        ))}
-                    </View>
-                ) : error ? (
-                    <ErrorState onRetry={subscribe} />
-                ) : filteredItems.length === 0 ? (
-                    <EmptyState category={selectedCategory} />
+                    <View style={styles.skeletonGrid}>{Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}</View>
                 ) : (
-                    <FlatList<ClosetItem>
+                    <FlatList
                         data={filteredItems}
-                        keyExtractor={keyExtractor}
-                        renderItem={renderItem}
+                        keyExtractor={(item) => item.id}
                         numColumns={2}
                         columnWrapperStyle={styles.columnWrapper}
                         contentContainerStyle={styles.listContent}
-                        showsVerticalScrollIndicator={false}
-                        ListFooterComponent={ListFooter}
-                        // ── Pagination ───────────────────────────────────────
                         onEndReached={loadMore}
-                        onEndReachedThreshold={0.4}   // trigger when 40% from bottom
-                        // ── Performance ──────────────────────────────────────
-                        removeClippedSubviews
-                        maxToRenderPerBatch={10}
-                        windowSize={5}
-                        initialNumToRender={8}
-                        getItemLayout={(_data, index) => ({
-                            length: ROW_H,
-                            offset: ROW_H * Math.floor(index / 2),
-                            index,
-                        })}
+                        onEndReachedThreshold={0.5}
+                        renderItem={({ item }) => (
+                            <OutfitCard
+                                item={item}
+                                isActive={activeCardId === item.id}
+                                onCardPress={setActiveCardId}
+                                onDelete={handleDelete}
+                                onOutfitPress={onOutfitPress}
+                            />
+                        )}
+                        ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} /> : null}
                     />
                 )}
             </SafeAreaView>
