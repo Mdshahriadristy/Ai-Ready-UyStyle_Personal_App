@@ -69,6 +69,11 @@ import PrivacyPolicyScreen   from '../settings/PrivacyPolicyScreen';
 import HelpScreen            from '../settings/HelpScreen';
 import ChangePasswordScreen from '../Screens/profile/Changepassword/ChangePasswordScreen';
 import AIChatScreen from '../Screens/AIChatScreen/AIChatScreen';
+import FavoriteLooksScreen from '../Screens/FavoriteLooksScreen/FavoriteLooksScreen';
+import AdditemScreen from '../Screens/addItem/AdditemScreen';
+import OutfitScreen from '../Screens/outfit/OutfitScreen';
+import ClosetScreen from '../Screens/closet/ClosetScreen';
+import AllitemsScreen from '../Screens/AllItems/Allitems';
 
 const Stack = createNativeStackNavigator();
 
@@ -95,6 +100,10 @@ const AppStack = () => (
     <Stack.Screen name="accountsettings" component={AccountSettingsScreen} />
     <Stack.Screen name="privacypolicy"   component={PrivacyPolicyScreen} />
     <Stack.Screen name="help"            component={HelpScreen} />
+    <Stack.Screen name="FavoriteLooksScreen"component={FavoriteLooksScreen} />
+    <Stack.Screen name="Additem"component={AdditemScreen} />
+    <Stack.Screen name="outfits"component={AllitemsScreen} />
+    <Stack.Screen name="closet"component={ClosetScreen} />
   </Stack.Navigator>
 );
 

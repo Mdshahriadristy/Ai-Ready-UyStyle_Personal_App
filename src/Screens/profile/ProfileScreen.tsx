@@ -1,6 +1,3 @@
-
-
-
 import React, { useCallback, useState } from 'react';
 import {
     View,
@@ -18,13 +15,15 @@ import { styles } from './style';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { getApp } from '@react-native-firebase/app';
 import { getAuth, signOut } from '@react-native-firebase/auth';
-import { getFirestore, doc, getDoc } from '@react-native-firebase/firestore';
-
-const stats = [
-    { label: 'Items',     value: '128' },
-    { label: 'Outfits',   value: '24'  },
-    { label: 'Favorites', value: '8'   },
-];
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    collection,
+    query,
+    where,
+    getCountFromServer,
+} from '@react-native-firebase/firestore';
 
 const menuItems = [
     { label: 'Notifications',    danger: false, screen: 'notification'    },
@@ -33,7 +32,6 @@ const menuItems = [
     { label: 'Help',             danger: false, screen: 'help'            },
     { label: 'Logout',           danger: true,  screen: null              },
 ];
-
 const favoriteLooks = [
     'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300',
     'https://images.unsplash.com/photo-1552664730-d307ca884978?w=300',
@@ -42,69 +40,117 @@ const favoriteLooks = [
 const ProfileScreen = () => {
     const navigation = useNavigation<any>();
 
-    // ── User data state ──────────────────────────────────
-    const [fullName,  setFullName]  = useState('');
-    const [photoURL,  setPhotoURL]  = useState<string | null>(null);
-    const [loading,   setLoading]   = useState(true);
+    const [fullName,      setFullName]      = useState('');
+    const [photoURL,      setPhotoURL]      = useState<string | null>(null);
+    const [loading,       setLoading]       = useState(true);
+
+    const [closetCount,   setClosetCount]   = useState(0);
+    const [outfitCount,   setOutfitCount]   = useState(0);
+    const [likesCount,    setLikesCount]    = useState(0);
+    const [countsLoading, setCountsLoading] = useState(true);
+
+
+    const [likedPreviews, setLikedPreviews] = useState<{ id: string; imageURL: string }[]>([]);
 
     const app  = getApp();
     const auth = getAuth(app);
     const db   = getFirestore(app);
     const user = auth.currentUser;
 
-
-
     useFocusEffect(
         useCallback(() => {
-            const fetchProfile = async () => {
-                if (!user) return;
+            if (!user) return;
+            let cancelled = false;
+
+            const fetchAll = async () => {
                 setLoading(true);
+                setCountsLoading(true);
+
+                const uid = user.uid;
+
                 try {
-                    const snap = await getDoc(doc(db, 'users', user.uid));
-                    if (snap.exists()) {
+                    // ── User profile doc ─────────────────────────────
+                    const snap = await getDoc(doc(db, 'users', uid));
+                    if (!cancelled && snap.exists()) {
                         const data = snap.data();
-                        setFullName(data?.fullName  || '');
-                        setPhotoURL(data?.photoURL  || null);
+                        setFullName(data?.fullName || '');
+                        setPhotoURL(data?.photoURL || null);
                     }
-                } catch (e) {
-                    console.log('Profile fetch error:', e);
+
+                    // ── Root-level collections, filtered by userId ───
+            
+                    const closetQuery  = query(collection(db, 'closetItems'), where('userId', '==', uid));
+                    const outfitsQuery = query(collection(db, 'outfits'),     where('userId', '==', uid));
+                    const likesQuery   = query(collection(db, 'likes'),       where('userId', '==', uid));
+
+                    const [closetSnap, outfitsSnap, likesSnap] = await Promise.all([
+                        getCountFromServer(closetQuery),
+                        getCountFromServer(outfitsQuery),
+                        getCountFromServer(likesQuery),
+                    ]);
+
+                    if (!cancelled) {
+                        setClosetCount(closetSnap.data().count);
+                        setOutfitCount(outfitsSnap.data().count);
+                        setLikesCount(likesSnap.data().count);
+                    }
+
+                    // ── Liked items preview (imageURL) for Favorite Looks ──
+                   
+                    const { getDocs, limit, orderBy } = await import('@react-native-firebase/firestore');
+                    const previewQuery = query(
+                        collection(db, 'likes'),
+                        where('userId', '==', uid),
+                        orderBy('createdAt', 'desc'),
+                        limit(2)
+                    );
+                    const previewSnap = await getDocs(previewQuery);
+                    if (!cancelled) {
+                        const previews = previewSnap.docs.map(d => ({
+                            id: d.id,
+                            imageURL: d.data().imageURL || '',
+                        })).filter(p => p.imageURL !== '');
+                        setLikedPreviews(previews);
+                    }
+
+                } catch (e: any) {
+                    console.log('[Profile] fetch error:', e?.message || e);
                 } finally {
-                    setLoading(false);
+                    if (!cancelled) {
+                        setLoading(false);
+                        setCountsLoading(false);
+                    }
                 }
             };
-            fetchProfile();
+
+            fetchAll();
+            return () => { cancelled = true; };
         }, [])
     );
 
-    // ── Logout ────────────────────────────────────────────
+    const stats = [
+        { label: 'Items',     value: countsLoading ? '—' : String(closetCount) },
+        { label: 'Outfits',   value: countsLoading ? '—' : String(outfitCount) },
+        { label: 'Favorites', value: countsLoading ? '—' : String(likesCount)  },
+    ];
+
     const handleLogout = () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await signOut(getAuth(getApp()));
-                        } catch (error: any) {
-                            Alert.alert('Error', error.message);
-                        }
-                    },
+        Alert.alert('Logout', 'Are you sure you want to logout?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Logout',
+                style: 'destructive',
+                onPress: async () => {
+                    try { await signOut(getAuth(getApp())); }
+                    catch (error: any) { Alert.alert('Error', error.message); }
                 },
-            ]
-        );
+            },
+        ]);
     };
 
-    // ── Menu press ────────────────────────────────────────
     const handleMenuPress = (item: { label: string; screen: string | null }) => {
-        if (item.label === 'Logout') {
-            handleLogout();
-        } else if (item.screen) {
-            navigation.navigate(item.screen);
-        }
+        if (item.label === 'Logout') handleLogout();
+        else if (item.screen) navigation.navigate(item.screen);
     };
 
     return (
@@ -118,32 +164,24 @@ const ProfileScreen = () => {
                 {/* Profile Header */}
                 <View style={styles.profileHeader}>
                     <View style={styles.profileLeft}>
-
-                        {/*  Avatar — Firestore photoURL দেখাবে */}
                         {loading ? (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                 <ActivityIndicator size="small" color="#2869BD" />
                             </View>
                         ) : photoURL ? (
-                            <Image
-                                source={{ uri: photoURL }}
-                                style={styles.avatar}
-                            />
+                            <Image source={{ uri: photoURL }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                 <User size={22} color="#94A3B8" />
                             </View>
                         )}
-
                         <View>
-                            {/*  Name — Firestore fullName দেখাবে */}
                             <Text style={styles.profileName}>
                                 Hi, {loading ? '...' : fullName || 'User'}
                             </Text>
                             <Text style={styles.profileSub}>Inspiration for today</Text>
                         </View>
                     </View>
-
                     <TouchableOpacity
                         onPress={() => navigation.navigate('profileedit')}
                         style={styles.editBtn}
@@ -185,11 +223,22 @@ const ProfileScreen = () => {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Favorite Looks</Text>
-                        <TouchableOpacity style={styles.seeAll} activeOpacity={0.7}>
+                        {/* See All → FavoriteLooksScreen */}
+                        <TouchableOpacity
+                            style={styles.seeAll}
+                            activeOpacity={0.7}
+                            onPress={() => navigation.navigate('FavoriteLooksScreen')}
+                        >
                             <Text style={styles.seeAllText}>See All</Text>
                             <ChevronRight size={14} color="#2869BD" />
                         </TouchableOpacity>
                     </View>
+
+                    
+
+                {/* Favorite Looks */}
+                <View style={styles.section}>
+
                     <View style={styles.favRow}>
                         {favoriteLooks.map((uri, index) => (
                             <TouchableOpacity key={index} style={styles.favCard} activeOpacity={0.85}>
@@ -197,6 +246,7 @@ const ProfileScreen = () => {
                             </TouchableOpacity>
                         ))}
                     </View>
+                </View>
                 </View>
 
                 {/* Menu Items */}

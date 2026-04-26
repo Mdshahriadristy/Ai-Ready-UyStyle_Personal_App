@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -6,162 +6,403 @@ import {
     TouchableOpacity,
     Image,
     StatusBar,
+    TextInput,
+    FlatList,
+    ActivityIndicator,
+    Animated,
+    Keyboard,
+    StyleSheet,
+    Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronRight, Search, Sparkles, Zap } from 'lucide-react-native';
+import { Bell, ChevronRight, Search, Sparkles, Zap, X, User } from 'lucide-react-native';
 import { styles } from './style';
 import { useNavigation } from '@react-navigation/native';
+import { getApp } from '@react-native-firebase/app';
+import { getAuth } from '@react-native-firebase/auth';
+import {
+    getFirestore,
+    doc,
+    onSnapshot,
+    collection,
+    query,
+    where,
+    getDocs,
+} from '@react-native-firebase/firestore';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+
+// ─── Unchanged hardcoded data (same as original) ──────────────────────────────
+
+const recentItems = [
+    { id: 1, name: 'White Oversiz...', category: 'Top',    image: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200' },
+    { id: 2, name: 'Blue Straight J...', category: 'Bottom', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=200' },
+    { id: 3, name: 'Black Sneake...',  category: 'Shoes',  image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200' },
+];
+
+const recentOutfits = [
+    { id: 1, name: 'Casual Friday...',   image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=200' },
+    { id: 2, name: 'Blue Straight J...', image: 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=200' },
+    { id: 3, name: 'Black Sneake...',    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=200' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const HomeScreen = () => {
     const [activeTab, setActiveTab] = useState<'wear' | 'build'>('wear');
     const navigation = useNavigation<any>();
 
-    const recentItems = [
-        { id: 1, name: 'White Oversiz...', category: 'Top', image: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200' },
-        { id: 2, name: 'Blue Straight J...', category: 'Bottom', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=200' },
-        { id: 3, name: 'Black Sneake...', category: 'Shoes', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200' },
-    ];
+    const app  = getApp();
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    const user = auth.currentUser;
 
-    const recentOutfits = [
-        { id: 1, name: 'Casual Friday...', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=200' },
-        { id: 2, name: 'Blue Straight J...', image: 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=200' },
-        { id: 3, name: 'Black Sneake...', image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=200' },
-    ];
+    // ── 1. Real-time profile photo ──────────────────────
+    const [photoURL, setPhotoURL] = useState<string | null>(null);
 
+    useEffect(() => {
+        if (!user) return;
+        const unsub = onSnapshot(
+            doc(db, 'users', user.uid),
+            (snap) => {
+                if (snap.exists()) setPhotoURL(snap.data()?.photoURL || null);
+            }
+        );
+        return () => unsub();
+    }, [user?.uid]);
+
+    // ── 2. Search state ─────────────────────────────────
+    const [searchVisible, setSearchVisible] = useState(false);
+    const [searchQuery,   setSearchQuery]   = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searching,     setSearching]     = useState(false);
+    const searchAnim = useRef(new Animated.Value(0)).current;
+    const inputRef   = useRef<TextInput>(null);
+
+    const toggleSearch = () => {
+        if (searchVisible) {
+            Keyboard.dismiss();
+            Animated.timing(searchAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start(() => {
+                setSearchVisible(false);
+                setSearchQuery('');
+                setSearchResults([]);
+            });
+        } else {
+            setSearchVisible(true);
+            Animated.timing(searchAnim, { toValue: 1, duration: 220, useNativeDriver: false }).start(() => {
+                inputRef.current?.focus();
+            });
+        }
+    };
+
+    const handleSearch = useCallback(async (text: string) => {
+        setSearchQuery(text);
+        if (!text.trim() || !user) { setSearchResults([]); return; }
+        setSearching(true);
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'closetItems'), where('userId', '==', user.uid))
+            );
+            const lower = text.toLowerCase();
+            setSearchResults(
+                snap.docs
+                    .map(d => ({ id: d.id, ...d.data() }) as any)
+                    .filter((i: any) =>
+                        (i.title    ?? '').toLowerCase().includes(lower) ||
+                        (i.category ?? '').toLowerCase().includes(lower) ||
+                        (i.color    ?? '').toLowerCase().includes(lower)
+                    )
+            );
+        } catch (e) {
+            console.warn('[Home] search error:', e);
+        } finally {
+            setSearching(false);
+        }
+    }, [user?.uid]);
+
+    const searchBarHeight = searchAnim.interpolate({
+        inputRange: [0, 1], outputRange: [0, 52],
+    });
+
+    // ── Render ───────────────────────────────────────────
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-            
-            {/* Header */}
+
+            {/* Header — only avatar + icons changed */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <Image
-                        source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
-                        style={styles.avatar}
-                    />
+
+                    {/* ✅ Dynamic avatar from Firebase */}
+                    {photoURL ? (
+                        <Image source={{ uri: photoURL }} style={styles.avatar} />
+                    ) : (
+                        <View style={[styles.avatar, localStyles.avatarFallback]}>
+                            <User size={18} color="#94A3B8" />
+                        </View>
+                    )}
+
                     <Text style={styles.headerText}>What are you wearing today?</Text>
                 </View>
+
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.headerIcon}>
-                        <Search size={20} color="#0F1729" />
+
+                    {/* ✅ Search toggle */}
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={toggleSearch}
+                        activeOpacity={0.7}
+                    >
+                        {searchVisible
+                            ? <X size={20} color="#2869BD" />
+                            : <Search size={20} color="#0F1729" />
+                        }
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.headerIcon}>
+
+                    {/* ✅ Bell → notification screen */}
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => navigation.navigate('notification')}
+                        activeOpacity={0.7}
+                    >
                         <View style={styles.notifWrapper}>
                             <Bell size={20} color="#1E293B" />
                             <View style={styles.notifDot} />
                         </View>
                     </TouchableOpacity>
+
                 </View>
             </View>
 
-            <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* --- Quick Fit Banner (Navigation Updated Here) --- */}
-                <TouchableOpacity 
-                    style={styles.quickFit} 
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('AIChatScreen')} // এখানে আপনার চ্যাট স্ক্রিনের নাম দিন
-                >
-                    <View style={styles.quickFitLeft}>
-                        <View style={styles.quickFitIcon}>
-                            <Zap size={16} color="#fff" />
-                        </View>
-                        <View>
-                            <Text style={styles.quickFitTitle}>Quick Fit</Text>
-                            <Text style={styles.quickFitSub}>Generate an outfit instantly with AI</Text>
-                        </View>
-                    </View>
-                    <Sparkles size={20} color="#fff" />
-                </TouchableOpacity>
-
-                {/* Today's Pick Banner */}
-                <View style={styles.todayPick}>
-                    <Image
-                        source={{ uri: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600' }}
-                        style={styles.todayPickImage}
+            {/* Animated Search Bar */}
+            <Animated.View style={{ height: searchBarHeight, overflow: 'hidden', paddingHorizontal: 16 }}>
+                <View style={localStyles.searchInputRow}>
+                    <Search size={15} color="#94A3B8" />
+                    <TextInput
+                        ref={inputRef}
+                        style={localStyles.searchInput}
+                        placeholder="Search by name, category, color..."
+                        placeholderTextColor="#94A3B8"
+                        value={searchQuery}
+                        onChangeText={handleSearch}
+                        returnKeyType="search"
+                        autoCorrect={false}
                     />
-                    <View style={styles.todayPickOverlay}>
-                        <Text style={styles.todayPickLabel}>Today's Pick</Text>
-                        <Text style={styles.todayPickTitle}>Casual sunny{'\n'}day look</Text>
-                    </View>
+                    {searching && <ActivityIndicator size="small" color="#2869BD" />}
                 </View>
+            </Animated.View>
 
-                {/* Wear / Build Tabs */}
-                <View style={styles.tabRow}>
-                    <TouchableOpacity
-                        style={[styles.tabBtn, activeTab === 'wear' && styles.tabBtnActive]}
-                        onPress={() => setActiveTab('wear')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'wear' && styles.tabTextActive]}>
-                            Wear This
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tabBtn, activeTab === 'build' && styles.tabBtnActive]}
-                        onPress={() => navigation.navigate('combine')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'build' && styles.tabTextActive]}>
-                            Build Another
-                        </Text>
-                    </TouchableOpacity>
+            {/* Search Results */}
+            {searchVisible && searchQuery.trim() !== '' && (
+                <View style={localStyles.searchOverlay}>
+                    {searchResults.length === 0 && !searching ? (
+                        <Text style={localStyles.searchEmpty}>No items found for "{searchQuery}"</Text>
+                    ) : (
+                        <FlatList
+                            data={searchResults}
+                            keyExtractor={i => i.id}
+                            numColumns={2}
+                            columnWrapperStyle={{ gap: 12 }}
+                            contentContainerStyle={{ padding: 16, gap: 12 }}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={localStyles.searchCard}
+                                    activeOpacity={0.85}
+                                    onPress={() => { toggleSearch(); navigation.navigate('closet'); }}
+                                >
+                                    {item.imageURL
+                                        ? <Image source={{ uri: item.imageURL }} style={localStyles.searchCardImg} />
+                                        : <View style={[localStyles.searchCardImg, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]} />
+                                    }
+                                    <Text style={localStyles.searchCardTitle} numberOfLines={1}>{item.title}</Text>
+                                    <Text style={localStyles.searchCardSub}>{item.category}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    )}
                 </View>
+            )}
 
-                {/* Recent Items */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Items</Text>
-                        <TouchableOpacity style={styles.seeAll}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                            <ChevronRight size={14} color="#65758B" />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.itemsRow}>
-                        {recentItems.map(item => (
-                            <TouchableOpacity key={item.id} style={styles.itemCard} activeOpacity={0.8}>
-                                <Image source={{ uri: item.image }} style={styles.itemImage} />
-                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                <Text style={styles.itemCategory}>{item.category}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Recent Outfits */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Outfits</Text>
-                        <TouchableOpacity style={styles.seeAll}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                            <ChevronRight size={14} color="#2869BD" />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.itemsRow}>
-                        {recentOutfits.map(item => (
-                            <TouchableOpacity key={item.id} style={styles.itemCard} activeOpacity={0.8}>
-                                <Image source={{ uri: item.image }} style={styles.itemImage} />
-                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Create Your Own */}
-                <TouchableOpacity 
-                    style={styles.createBtn} 
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate('combine')}
+            {/* ── Main Content (100% unchanged from original) ── */}
+            {!(searchVisible && searchQuery.trim() !== '') && (
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.createBtnText}>Create Your Own</Text>
-                </TouchableOpacity>
+                    {/* Quick Fit Banner */}
+                    <TouchableOpacity
+                        style={styles.quickFit}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate('AIChatScreen')}
+                    >
+                        <View style={styles.quickFitLeft}>
+                            <View style={styles.quickFitIcon}>
+                                <Zap size={16} color="#fff" />
+                            </View>
+                            <View>
+                                <Text style={styles.quickFitTitle}>Quick Fit</Text>
+                                <Text style={styles.quickFitSub}>Generate an outfit instantly with AI</Text>
+                            </View>
+                        </View>
+                        <Sparkles size={20} color="#fff" />
+                    </TouchableOpacity>
 
-            </ScrollView>
+                    {/* Today's Pick Banner */}
+                    <View style={styles.todayPick}>
+                        <Image
+                            source={{ uri: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600' }}
+                            style={styles.todayPickImage}
+                        />
+                        <View style={styles.todayPickOverlay}>
+                            <Text style={styles.todayPickLabel}>Today's Pick</Text>
+                            <Text style={styles.todayPickTitle}>Casual sunny{'\n'}day look</Text>
+                        </View>
+                    </View>
+
+                    {/* Wear / Build Tabs */}
+                    <View style={styles.tabRow}>
+                        <TouchableOpacity
+                            style={[styles.tabBtn, activeTab === 'wear' && styles.tabBtnActive]}
+                            onPress={() => setActiveTab('wear')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'wear' && styles.tabTextActive]}>
+                                Wear This
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tabBtn, activeTab === 'build' && styles.tabBtnActive]}
+                            onPress={() => navigation.navigate('combine')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'build' && styles.tabTextActive]}>
+                                Build Another
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Recent Items */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Recent Items</Text>
+                            <TouchableOpacity
+                                style={styles.seeAll}
+                                onPress={() => navigation.navigate('closet')}
+                            >
+                                <Text style={styles.seeAllText}>See All</Text>
+                                <ChevronRight size={14} color="#65758B" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.itemsRow}>
+                            {recentItems.map(item => (
+                                <TouchableOpacity key={item.id} style={styles.itemCard} activeOpacity={0.8}>
+                                    <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={styles.itemCategory}>{item.category}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Recent Outfits */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Recent Outfits</Text>
+                            <TouchableOpacity
+                                style={styles.seeAll}
+                                onPress={() => navigation.navigate('outfits')}
+                            >
+                                <Text style={styles.seeAllText}>See All</Text>
+                                <ChevronRight size={14} color="#2869BD" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.itemsRow}>
+                            {recentOutfits.map(item => (
+                                <TouchableOpacity key={item.id} style={styles.itemCard} activeOpacity={0.8}>
+                                    <Image source={{ uri: item.image }} style={styles.itemImage} />
+                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Create Your Own */}
+                    <TouchableOpacity
+                        style={styles.createBtn}
+                        activeOpacity={0.85}
+                        onPress={() => navigation.navigate('combine')}
+                    >
+                        <Text style={styles.createBtnText}>Create Your Own</Text>
+                    </TouchableOpacity>
+
+                </ScrollView>
+            )}
         </SafeAreaView>
     );
 };
+
+// ─── Local styles ─────────────────────────────────────────────────────────────
+
+const localStyles = StyleSheet.create({
+    avatarFallback: {
+        backgroundColor: '#E2E8F0',
+        alignItems:      'center',
+        justifyContent:  'center',
+    },
+    searchInputRow: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        gap:                8,
+        backgroundColor:   '#F3F4F6',
+        borderRadius:       12,
+        paddingHorizontal: 14,
+        height:             44,
+        marginBottom:        8,
+    },
+    searchInput: {
+        flex:       1,
+        fontSize:   14,
+        fontFamily: 'InterRegular',
+        color:      '#1E293B',
+    },
+    searchOverlay: {
+        flex:            1,
+        backgroundColor: '#fff',
+    },
+    searchEmpty: {
+        textAlign:  'center',
+        padding:     40,
+        color:      '#94A3B8',
+        fontSize:    14,
+        fontFamily: 'InterRegular',
+    },
+    searchCard: {
+        flex:            1,
+        backgroundColor: '#F8FAFC',
+        borderRadius:    12,
+        overflow:        'hidden',
+    },
+    searchCardImg: {
+        width:  '100%',
+        height: (SCREEN_W / 2) - 28,
+    },
+    searchCardTitle: {
+        fontSize:          13,
+        fontFamily:        'InterSemiBold',
+        fontWeight:        '600',
+        color:             '#1E293B',
+        paddingHorizontal: 10,
+        paddingTop:         8,
+    },
+    searchCardSub: {
+        fontSize:          11,
+        fontFamily:        'InterRegular',
+        color:             '#94A3B8',
+        paddingHorizontal: 10,
+        paddingBottom:      8,
+    },
+});
 
 export default HomeScreen;

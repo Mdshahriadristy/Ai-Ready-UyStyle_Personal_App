@@ -376,7 +376,7 @@ const ProfileEditScreen = ({ navigation }: any) => {
         if (response.didCancel || response.errorCode) return;
         const asset = response.assets?.[0];
         if (asset?.uri) {
-            setAvatarUri(asset.uri); // local preview
+            setAvatarUri(asset.uri); 
             setImageFile(asset);
         }
     };

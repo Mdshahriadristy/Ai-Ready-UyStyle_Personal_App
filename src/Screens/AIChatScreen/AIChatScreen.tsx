@@ -8,20 +8,27 @@ import React, {
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     FlatList,
     Image,
     StatusBar,
     Animated,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     ActivityIndicator,
-    Keyboard,
+    StyleSheet,
+    Dimensions,
+    TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Send, Sparkles, RefreshCw, Shirt } from 'lucide-react-native';
+import {
+    Shuffle,
+    Plus,
+    Shirt,
+    RefreshCw,
+    Sparkles,
+    Search,
+    Heart,
+} from 'lucide-react-native';
 import { getApp } from '@react-native-firebase/app';
 import { getAuth } from '@react-native-firebase/auth';
 import {
@@ -32,629 +39,760 @@ import {
     getDocs,
     getDoc,
     doc,
-    QueryDocumentSnapshot,
-    DocumentData,
 } from '@react-native-firebase/firestore';
-import { styles } from './Style';
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-// API key is fetched at runtime from Firestore:
-//   Collection : 'config'   Document : 'keys'   Field : 'anthropicKey'
-// ─────────────────────────────────────────────────────────────────────────────
-const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const { width: SCREEN_W } = Dimensions.get('window');
+const CARD_GAP   = 12;
+const CARD_WIDTH = (SCREEN_W - 32 - CARD_GAP) / 2;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WardrobeItem = {
-    id: string;
-    title: string;
-    category: string;
-    color: string;
-    imageURL: string;
+type ClosetItem = {
+    id:        string;
+    title:     string;
+    category:  string;
+    color:     string;
+    imageURL:  string;
+    userId:    string;
+    likeCount: number;
+    createdAt: any;
 };
 
-type SuggestedOutfit = {
-    name: string;
+type StylePrefs = {
+    styles:    string[];
+    occasions: string[];
+    colors:    string[];
+};
+
+type Outfit = {
+    id:       string;
+    name:     string;
     occasion: string;
-    items: WardrobeItem[];
+    items:    ClosetItem[];
 };
 
-type ChatRole = 'user' | 'assistant';
-
-type Message = {
-    id: string;
-    role: ChatRole;
-    text: string;
-    outfits?: SuggestedOutfit[];
-    isLoading?: boolean;
-    timestamp: Date;
-};
-
-type AIResponse = {
-    text: string;
-    outfits?: { name: string; occasion: string; itemIds: string[] }[];
-};
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const QUICK_PROMPTS = [
-    "What should I wear today? 🌤️",
-    "Suggest a casual weekend look",
-    "Give me a night out outfit",
-    "What matches my blue jeans?",
-    "Build a gym outfit for me",
-    "Best outfit for a date night?",
+// ─── Filter tabs — emoji সরিয়ে দিলাম, শুধু text ──────────────────────────────
+const FILTER_TABS = [
+    { id: 'all',     label: 'All'      },
+    { id: 'casual',  label: 'Casual'   },
+    { id: 'gym',     label: 'Gym'      },
+    { id: 'formal',  label: 'Formal'   },
+    { id: 'night',   label: 'Night Out'},
+    { id: 'weekend', label: 'Weekend'  },
 ];
 
-// ─── Firestore mapper ─────────────────────────────────────────────────────────
-
-const mapDocToItem = (d: QueryDocumentSnapshot<DocumentData>): WardrobeItem => {
-    const data = d.data();
-    const itemDetails = data.itemDetails || {};
-    const firstKey = Object.keys(itemDetails)[0];
-    const details  = itemDetails[firstKey] || {};
-    return {
-        id:       d.id,
-        title:    details.title    || 'Untitled',
-        category: details.category || 'Uncategorized',
-        color:    details.color    || '',
-        imageURL: details.imageURL || '',
-    };
+const OUTFIT_NAMES: Record<string, string[]> = {
+    all:     ['Everyday Look', 'Daily Fit', 'Go-To Outfit', 'Fresh Combo'],
+    casual:  ['Chill Vibes', 'Weekend Casual', 'Laid-Back Look'],
+    gym:     ['Gym Session', 'Workout Ready', 'Active Mode'],
+    formal:  ['Office Ready', 'Business Look', 'Smart Formal'],
+    night:   ['Night Out', 'Evening Glam', 'Party Mode'],
+    weekend: ['Weekend Mood', 'Sunday Fit', 'Brunch Ready'],
 };
 
-// ─── Build wardrobe context string for AI ─────────────────────────────────────
-
-const buildWardrobeContext = (wardrobe: WardrobeItem[]): string => {
-    if (wardrobe.length === 0) return 'The user has no saved wardrobe items yet.';
-    const grouped: Record<string, WardrobeItem[]> = {};
-    wardrobe.forEach(item => {
-        if (!grouped[item.category]) grouped[item.category] = [];
-        grouped[item.category].push(item);
-    });
-    return Object.entries(grouped)
-        .map(([cat, items]) =>
-            `${cat}:\n` +
-            items.map(i => `  - [ID:${i.id}] "${i.title}" (${i.color})`).join('\n')
-        )
-        .join('\n\n');
+const FILTER_KEYWORDS: Record<string, string[]> = {
+    gym:     ['gym', 'sport', 'active', 'athletic', 'workout'],
+    formal:  ['formal', 'business', 'office', 'suit', 'blazer'],
+    night:   ['night', 'party', 'evening', 'dress'],
+    weekend: ['casual', 'weekend', 'relax', 'denim'],
+    casual:  ['casual', 'basic', 't-shirt', 'jeans', 'tee'],
 };
 
-// ─── System Prompt ────────────────────────────────────────────────────────────
-
-const buildSystemPrompt = (wardrobe: WardrobeItem[]): string => `
-You are a personal AI fashion stylist. You help users create stylish outfits from their saved wardrobe.
-
-USER'S WARDROBE INVENTORY:
-${buildWardrobeContext(wardrobe)}
-
-RESPONSE RULES:
-1. Always respond in valid JSON with this exact structure:
-{
-  "text": "Your friendly stylist message here",
-  "outfits": [
-    {
-      "name": "Outfit name",
-      "occasion": "When to wear it",
-      "itemIds": ["item-id-1", "item-id-2"]
-    }
-  ]
+function colorMatches(itemColor: string, prefColors: string[]): boolean {
+    if (!prefColors || prefColors.length === 0) return true;
+    const c = itemColor.toLowerCase();
+    return prefColors.some(p => c.includes(p.toLowerCase()) || p.toLowerCase().includes(c));
 }
 
-2. The "outfits" array is OPTIONAL. Only include it when suggesting specific outfit combinations.
-3. itemIds must be REAL IDs from the wardrobe inventory above (format [ID:xxx]).
-4. Suggest 1–3 outfits max per response. Keep text warm, concise, and stylish.
-5. If the wardrobe is empty or lacks items for the request, say so kindly and give general advice.
-6. If a question is not about fashion or styling, politely redirect to wardrobe topics.
-7. ALWAYS return valid JSON. Never return plain text.
-`.trim();
+function generateOutfits(
+    items: ClosetItem[],
+    filter: string,
+    stylePrefs: StylePrefs | null,
+    count = 3,
+): { outfits: Outfit[]; notEnough: boolean } {
 
-// ─── Anthropic API call ───────────────────────────────────────────────────────
+    const shuffle = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
-async function callAI(
-    apiKey: string,
-    systemPrompt: string,
-    history: { role: ChatRole; content: string }[],
-    userMessage: string,
-): Promise<AIResponse> {
-    const messages = [
-        ...history.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: userMessage },
-    ];
+    let pool = items;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-            model:      ANTHROPIC_MODEL,
-            max_tokens: 1024,
-            system:     systemPrompt,
-            messages,
-        }),
-    });
+    if (stylePrefs && filter !== 'all') {
+        const prefStylesLower = (stylePrefs.styles ?? []).map(s => s.toLowerCase());
+        const filterInPrefs = prefStylesLower.some(s =>
+            s.includes(filter) || filter.includes(s)
+        );
+        if (!filterInPrefs) return { outfits: [], notEnough: true };
 
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`API error ${response.status}: ${err}`);
-    }
-
-    const data = await response.json();
-    const rawText = data.content?.[0]?.text ?? '{"text":"Sorry, I had trouble responding."}';
-
-    try {
-        // Strip markdown fences if present
-        const clean = rawText.replace(/```json\n?|```\n?/g, '').trim();
-        return JSON.parse(clean) as AIResponse;
-    } catch {
-        return { text: rawText };
-    }
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-/** Animated "typing" dots for the AI loading state */
-const TypingIndicator: React.FC = () => {
-    const dots = [useRef(new Animated.Value(0)).current,
-                  useRef(new Animated.Value(0)).current,
-                  useRef(new Animated.Value(0)).current];
-
-    useEffect(() => {
-        const animations = dots.map((dot, i) =>
-            Animated.loop(
-                Animated.sequence([
-                    Animated.delay(i * 160),
-                    Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
-                    Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
-                    Animated.delay((2 - i) * 160),
-                ])
+        const keywords = FILTER_KEYWORDS[filter] ?? [];
+        const filtered = items.filter(i =>
+            keywords.some(k =>
+                (i.category ?? '').toLowerCase().includes(k) ||
+                (i.title ?? '').toLowerCase().includes(k)
             )
         );
-        animations.forEach(a => a.start());
-        return () => animations.forEach(a => a.stop());
-    }, []);
+        pool = filtered.length >= 2 ? filtered : items;
+    }
+
+    if (stylePrefs?.colors?.length) {
+        const colorFiltered = pool.filter(i => colorMatches(i.color, stylePrefs.colors));
+        pool = colorFiltered.length >= 2 ? colorFiltered : pool;
+    }
+
+    if (pool.length < 2) return { outfits: [], notEnough: true };
+
+    const tops    = pool.filter(i => /top|shirt|tee|blouse|hoodie|sweater|jacket|coat|outerwear/i.test(i.category));
+    const bottoms = pool.filter(i => /bottom|pant|jean|skirt|short|trouser/i.test(i.category));
+    const shoes   = pool.filter(i => /shoe|sneaker|boot|sandal|footwear/i.test(i.category));
+
+    const outfits: Outfit[] = [];
+    const usedCombos = new Set<string>();
+    const names  = OUTFIT_NAMES[filter] ?? OUTFIT_NAMES.all;
+    const occasion = FILTER_TABS.find(t => t.id === filter)?.label ?? 'Everyday';
+
+    for (let attempt = 0; attempt < 30 && outfits.length < count; attempt++) {
+        const top    = shuffle(tops)[0];
+        const bottom = shuffle(bottoms)[0];
+        const shoe   = shuffle(shoes)[0];
+        const comboItems = [top, bottom, shoe].filter(Boolean) as ClosetItem[];
+        if (comboItems.length < 1) continue;
+        const key = comboItems.map(i => i.id).sort().join('|');
+        if (usedCombos.has(key)) continue;
+        usedCombos.add(key);
+        outfits.push({
+            id:       `outfit-${Date.now()}-${outfits.length}`,
+            name:     names[outfits.length % names.length],
+            occasion,
+            items:    comboItems,
+        });
+    }
+
+    if (outfits.length === 0) {
+        const shuffled = shuffle(pool);
+        for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+            const comboItems = shuffled.slice(i, i + Math.min(3, shuffled.length - i));
+            if (comboItems.length === 0) break;
+            outfits.push({
+                id:       `outfit-fallback-${i}`,
+                name:     names[i % names.length],
+                occasion,
+                items:    comboItems,
+            });
+        }
+    }
+
+    return { outfits, notEnough: outfits.length === 0 };
+}
+
+// ─── ItemCard ─────────────────────────────────────────────────────────────────
+
+const ItemCard: React.FC<{ item: ClosetItem }> = React.memo(({ item }) => {
+    const count = item.likeCount ?? 0;
+    return (
+        <View style={cardStyles.card}>
+            <View style={cardStyles.imageWrapper}>
+                {item.imageURL ? (
+                    <Image source={{ uri: item.imageURL }} style={cardStyles.image} resizeMode="cover" />
+                ) : (
+                    <View style={cardStyles.imageFallback}>
+                        <Shirt size={28} color="#CBD5E1" />
+                    </View>
+                )}
+            </View>
+            <View style={cardStyles.info}>
+                <Text style={cardStyles.title} numberOfLines={1}>{item.title}</Text>
+                <View style={cardStyles.metaRow}>
+                    <Text style={cardStyles.meta} numberOfLines={1}>
+                        {item.category ?? '—'} · {item.color ?? '—'}
+                    </Text>
+                    {count > 0 && (
+                        <View style={cardStyles.badge}>
+                            <Heart size={10} color="#ef4444" fill="#ef4444" strokeWidth={0} />
+                            <Text style={cardStyles.badgeText}>
+                                {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+        </View>
+    );
+});
+
+// ─── OutfitCard ───────────────────────────────────────────────────────────────
+
+const OutfitCard: React.FC<{ outfit: Outfit; index: number }> = ({ outfit, index }) => {
+    const slideAnim = useRef(new Animated.Value(40)).current;
+    const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim,  { toValue: 1, duration: 350, delay: index * 120, useNativeDriver: true }),
+            Animated.spring(slideAnim, { toValue: 0, friction: 8,   delay: index * 120, useNativeDriver: true }),
+        ]).start();
+    }, [outfit.id]);
 
     return (
-        <View style={styles.typingBubble}>
-            <View style={styles.typingDotsRow}>
-                {dots.map((dot, i) => (
-                    <Animated.View
-                        key={i}
-                        style={[
-                            styles.typingDot,
-                            { opacity: dot, transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }] },
-                        ]}
-                    />
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            <View style={styles.outfitCardHeader}>
+                <View style={styles.outfitHeaderLeft}>
+                    <View style={styles.outfitIndexBadge}>
+                        <Text style={styles.outfitIndexText}>{index + 1}</Text>
+                    </View>
+                    <View>
+                        <Text style={styles.outfitName}>{outfit.name}</Text>
+                        <Text style={styles.outfitOccasion}>{outfit.occasion} · {outfit.items.length} pieces</Text>
+                    </View>
+                </View>
+            </View>
+            <View style={styles.outfitItemsGrid}>
+                {outfit.items.map(item => (
+                    <ItemCard key={item.id} item={item} />
                 ))}
             </View>
+        </Animated.View>
+    );
+};
+
+// ─── FilterTab — ────────────────────────────
+
+const FilterTab: React.FC<{
+    tab: typeof FILTER_TABS[0];
+    selected: boolean;
+    onPress: () => void;
+}> = ({ tab, selected, onPress }) => (
+    <TouchableOpacity
+        style={[styles.filterTab, selected && styles.filterTabSelected]}
+        onPress={onPress}
+        activeOpacity={0.75}
+    >
+        <Text style={[styles.filterTabLabel, selected && styles.filterTabLabelSelected]}>
+            {tab.label}
+        </Text>
+    </TouchableOpacity>
+);
+
+
+
+const NotEnoughState: React.FC<{
+    onAdd:  () => void;
+    filter: string;
+    prefs:  StylePrefs | null;
+}> = ({ onAdd, filter, prefs }) => {
+    const bounceAnim = useRef(new Animated.Value(1)).current;
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(bounceAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
+                Animated.timing(bounceAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    const filterLabel = FILTER_TABS.find(t => t.id === filter)?.label ?? filter;
+    const prefStylesLower = (prefs?.styles ?? []).map(s => s.toLowerCase());
+    const filterInPrefs   = filter === 'all' || prefStylesLower.some(s =>
+        s.includes(filter) || filter.includes(s)
+    );
+    const msg = !filterInPrefs
+        ? `"${filterLabel}" isn't in your style preferences.`
+        : prefs?.colors?.length
+        ? `Not enough items matching your favorite colors for "${filterLabel}" outfits.`
+        : `Not enough "${filterLabel}" items in your closet.\nAdd more to unlock outfit suggestions!`;
+
+    return (
+        <View style={styles.emptyState}>
+            <Animated.View style={[styles.emptyIconWrap, { transform: [{ scale: bounceAnim }] }]}>
+                <Shirt size={48} color="#CBD5E1" />
+            </Animated.View>
+            <Text style={styles.emptyTitle}>Add more items to get{'\n'}better outfit suggestions.</Text>
+            <Text style={styles.emptyMsg}>{msg}</Text>
+            <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
+                <Plus size={16} color="#fff" />
+                <Text style={styles.addBtnText}>Add Items to Closet</Text>
+            </TouchableOpacity>
         </View>
     );
 };
 
-/** Single outfit suggestion card rendered inside a chat bubble */
-const OutfitCard: React.FC<{ outfit: SuggestedOutfit; index: number }> = ({ outfit, index }) => {
-    const fadeAnim  = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(20)).current;
 
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim,  { toValue: 1, duration: 300, delay: index * 100, useNativeDriver: true }),
-            Animated.spring(slideAnim, { toValue: 0, friction: 8, delay: index * 100, useNativeDriver: true }),
-        ]).start();
-    }, []);
 
-    return (
-        <Animated.View style={[styles.outfitCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            {/* Card header */}
-            <View style={styles.outfitCardHeader}>
-                <View style={styles.outfitCardMeta}>
-                    <Text style={styles.outfitCardName}>{outfit.name}</Text>
-                    <Text style={styles.outfitCardOccasion}>{outfit.occasion}</Text>
-                </View>
-                <View style={styles.outfitCardBadge}>
-                    <Text style={styles.outfitCardBadgeText}>{outfit.items.length} pcs</Text>
-                </View>
-            </View>
+const AIChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+    const app  = getApp();
+    const db   = getFirestore(app);
+    const user = getAuth(app).currentUser;
 
-            {/* Item images */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.outfitItemsRow}
-            >
-                {outfit.items.map(item => (
-                    <View key={item.id} style={styles.outfitItemTile}>
-                        {item.imageURL ? (
-                            <Image
-                                source={{ uri: item.imageURL }}
-                                style={styles.outfitItemImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <View style={styles.outfitItemFallback}>
-                                <Text style={styles.outfitItemFallbackText}>
-                                    {item.title[0]?.toUpperCase()}
-                                </Text>
-                            </View>
-                        )}
-                        <Text style={styles.outfitItemCategory} numberOfLines={1}>
-                            {item.category}
-                        </Text>
-                        <Text style={styles.outfitItemTitle} numberOfLines={1}>
-                            {item.title}
-                        </Text>
-                        {item.color ? (
-                            <Text style={styles.outfitItemColor} numberOfLines={1}>
-                                {item.color}
-                            </Text>
-                        ) : null}
-                    </View>
-                ))}
-            </ScrollView>
-        </Animated.View>
-    );
-};
+    const [closetItems,  setClosetItems]  = useState<ClosetItem[]>([]);
+    const [stylePrefs,   setStylePrefs]   = useState<StylePrefs | null>(null);
+    const [outfits,      setOutfits]      = useState<Outfit[]>([]);
+    const [notEnough,    setNotEnough]    = useState(false);
+    const [activeFilter, setActiveFilter] = useState('all');
+    const [loading,      setLoading]      = useState(true);
+    const [generating,   setGenerating]   = useState(false);
 
-/** A single chat message bubble */
-const MessageBubble: React.FC<{ message: Message; wardrobe: WardrobeItem[] }> = ({
-    message,
-    wardrobe,
-}) => {
-    const isUser = message.role === 'user';
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(isUser ? 16 : -16)).current;
+    const spinAnim = useRef(new Animated.Value(0)).current;
+    const startSpin = () => {
+        spinAnim.setValue(0);
+        Animated.timing(spinAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    };
+    const spinDeg = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim,  { toValue: 1, duration: 250, useNativeDriver: true }),
-            Animated.spring(slideAnim, { toValue: 0, friction: 10, useNativeDriver: true }),
-        ]).start();
-    }, []);
-
-    if (message.isLoading) {
-        return (
-            <Animated.View style={[styles.messageRow, styles.messageRowAssistant, { opacity: fadeAnim }]}>
-                <View style={styles.avatarDot}><Sparkles size={12} color="#F4C430" /></View>
-                <TypingIndicator />
-            </Animated.View>
-        );
-    }
-
-    // Resolve outfit items from wardrobe
-    const resolvedOutfits: SuggestedOutfit[] = (message.outfits ?? []).map(outfit => ({
-        ...outfit,
-        items: outfit.items.filter(Boolean),
-    }));
-
-    return (
-        <Animated.View
-            style={[
-                styles.messageRow,
-                isUser ? styles.messageRowUser : styles.messageRowAssistant,
-                { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
-            ]}
-        >
-            {!isUser && (
-                <View style={styles.avatarDot}>
-                    <Sparkles size={12} color="#F4C430" />
-                </View>
-            )}
-
-            <View style={styles.bubbleWrapper}>
-                <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-                    <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
-                        {message.text}
-                    </Text>
-                </View>
-
-                {/* Outfit suggestion cards */}
-                {resolvedOutfits.length > 0 && (
-                    <View style={styles.outfitsContainer}>
-                        {resolvedOutfits.map((outfit, idx) => (
-                            <OutfitCard key={idx} outfit={outfit} index={idx} />
-                        ))}
-                    </View>
-                )}
-
-                <Text style={[styles.timestamp, isUser && styles.timestampRight]}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-            </View>
-        </Animated.View>
-    );
-};
-
-/** Quick prompt chip */
-const PromptChip: React.FC<{ label: string; onPress: () => void }> = ({ label, onPress }) => (
-    <TouchableOpacity style={styles.promptChip} onPress={onPress} activeOpacity={0.75}>
-        <Text style={styles.promptChipText}>{label}</Text>
-    </TouchableOpacity>
-);
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
-const AIChatScreen: React.FC = () => {
-    const db   = getFirestore(getApp());
-    const user = getAuth().currentUser;
-
-    const [wardrobe,        setWardrobe]        = useState<WardrobeItem[]>([]);
-    const [wardrobeLoading, setWardrobeLoading] = useState(true);
-    const [apiKey,          setApiKey]          = useState<string>('');
-    const [keyError,        setKeyError]        = useState(false);
-    const [messages,        setMessages]        = useState<Message[]>([]);
-    const [inputText,       setInputText]       = useState('');
-    const [isThinking,      setIsThinking]      = useState(false);
-
-    const flatListRef = useRef<FlatList>(null);
-
-    // ── Conversation history for multi-turn context ───────────────────────────
-    const historyRef = useRef<{ role: ChatRole; content: string }[]>([]);
-
-    // ── Fetch API key from Firestore ──────────────────────────────────────────
-    // Firestore path:  config / keys  →  { anthropicKey: "sk-ant-..." }
-    useEffect(() => {
-        const fetchApiKey = async () => {
-            try {
-                const snap = await getDoc(doc(db, 'config', 'keys'));
-                const key  = snap.data()?.anthropicKey as string | undefined;
-                if (key && key.startsWith('sk-')) {
-                    setApiKey(key);
-                } else {
-                    console.warn('[AIChatScreen] anthropicKey not found or invalid in config/keys');
-                    setKeyError(true);
-                }
-            } catch (err) {
-                console.error('[AIChatScreen] Failed to fetch API key:', err);
-                setKeyError(true);
-            }
-        };
-        fetchApiKey();
-    }, []);
-
-    // ── Fetch wardrobe from Firestore ─────────────────────────────────────────
     useEffect(() => {
         if (!user) return;
-        const q = query(collection(db, 'outfits'), where('userId', '==', user.uid));
-        getDocs(q)
-            .then(snap => {
-                const items = snap.docs.map(mapDocToItem);
-                setWardrobe(items);
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const q    = query(collection(db, 'closetItems'), where('userId', '==', user.uid));
+                const snap = await getDocs(q);
+                const items: ClosetItem[] = snap.docs.map(d => ({
+                    id: d.id, likeCount: 0, ...(d.data() as any),
+                }));
+                setClosetItems(items);
 
-                // Welcome message with wardrobe summary
-                const welcomeText = items.length === 0
-                    ? "Hi! I'm your personal stylist ✨ Your wardrobe seems empty — add some items and I'll start suggesting outfits!"
-                    : `Hey there! 👋 I've loaded your wardrobe — **${items.length} items** across ${new Set(items.map(i => i.category)).size} categories. Ask me anything about styling them!`;
+                const prefsSnap = await getDoc(doc(db, 'stylePrefs', user.uid));
+                const prefs = prefsSnap.exists() ? (prefsSnap.data() as StylePrefs) : null;
+                setStylePrefs(prefs);
 
-                setMessages([{
-                    id:        'welcome',
-                    role:      'assistant',
-                    text:      welcomeText,
-                    timestamp: new Date(),
-                }]);
-            })
-            .catch(() => {
-                setMessages([{
-                    id:        'welcome-error',
-                    role:      'assistant',
-                    text:      "Hi! Couldn't load your wardrobe right now. Try again in a moment.",
-                    timestamp: new Date(),
-                }]);
-            })
-            .finally(() => setWardrobeLoading(false));
+                const result = generateOutfits(items, 'all', prefs);
+                setOutfits(result.outfits);
+                setNotEnough(result.notEnough);
+            } catch (err) {
+                console.error('[QuickFit] fetch error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
     }, [user?.uid]);
 
-    // ── Scroll to bottom on new messages ─────────────────────────────────────
-    const scrollToBottom = useCallback(() => {
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }, []);
+    const handleGenerate = useCallback((filter: string = activeFilter) => {
+        setGenerating(true);
+        startSpin();
+        setTimeout(() => {
+            const result = generateOutfits(closetItems, filter, stylePrefs);
+            setOutfits(result.outfits);
+            setNotEnough(result.notEnough);
+            setGenerating(false);
+        }, 500);
+    }, [closetItems, activeFilter, stylePrefs]);
 
-    useEffect(() => { scrollToBottom(); }, [messages.length]);
-
-    // ── System prompt (memoised) ──────────────────────────────────────────────
-    const systemPrompt = useMemo(() => buildSystemPrompt(wardrobe), [wardrobe]);
-
-    // ── Send message ──────────────────────────────────────────────────────────
-    const sendMessage = useCallback(async (text: string) => {
-        const trimmed = text.trim();
-        if (!trimmed || isThinking) return;
-
-        if (!apiKey) {
-            setMessages(prev => [...prev, {
-                id:        `key-error-${Date.now()}`,
-                role:      'assistant' as ChatRole,
-                text:      "⚠️ AI key not configured. Add your Anthropic key to Firestore at config/keys → anthropicKey.",
-                timestamp: new Date(),
-            }]);
-            return;
-        }
-
-        Keyboard.dismiss();
-        setInputText('');
-
-        // Add user message
-        const userMsg: Message = {
-            id:        `user-${Date.now()}`,
-            role:      'user',
-            text:      trimmed,
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, userMsg]);
-
-        // Add loading placeholder
-        const loadingId = `loading-${Date.now()}`;
-        setMessages(prev => [...prev, {
-            id:        loadingId,
-            role:      'assistant',
-            text:      '',
-            isLoading: true,
-            timestamp: new Date(),
-        }]);
-        setIsThinking(true);
-
-        try {
-            const aiResponse = await callAI(apiKey, systemPrompt, historyRef.current, trimmed);
-
-            // Build wardrobe lookup map
-            const wardrobeMap = new Map(wardrobe.map(i => [i.id, i]));
-
-            // Resolve outfit items
-            const resolvedOutfits: SuggestedOutfit[] | undefined = aiResponse.outfits?.map(o => ({
-                name:     o.name,
-                occasion: o.occasion,
-                items:    o.itemIds
-                    .map(id => wardrobeMap.get(id))
-                    .filter(Boolean) as WardrobeItem[],
-            })).filter(o => o.items.length > 0);
-
-            // Build assistant message
-            const assistantMsg: Message = {
-                id:        `assistant-${Date.now()}`,
-                role:      'assistant',
-                text:      aiResponse.text,
-                outfits:   resolvedOutfits,
-                timestamp: new Date(),
-            };
-
-historyRef.current = [
-    ...historyRef.current,
-    { role: 'user' as const,      content: trimmed },
-    { role: 'assistant' as const, content: aiResponse.text },
-].slice(-20);
-
-            // Replace loading with real message
-            setMessages(prev => prev.filter(m => m.id !== loadingId).concat(assistantMsg));
-        } catch (err) {
-            const errorMsg: Message = {
-                id:        `error-${Date.now()}`,
-                role:      'assistant',
-                text:      "Sorry, something went wrong. Please check your connection and try again.",
-                timestamp: new Date(),
-            };
-            setMessages(prev => prev.filter(m => m.id !== loadingId).concat(errorMsg));
-        } finally {
-            setIsThinking(false);
-        }
-    }, [isThinking, systemPrompt, wardrobe]);
-
-    // ── Clear conversation ────────────────────────────────────────────────────
-    const clearChat = useCallback(() => {
-        historyRef.current = [];
-        setMessages(prev => prev.slice(0, 1)); // Keep welcome message
-    }, []);
-
-    // ─── Render ───────────────────────────────────────────────────────────────
-
-    const showQuickPrompts = messages.length <= 1;
+    const handleFilterChange = (filterId: string) => {
+        setActiveFilter(filterId);
+        handleGenerate(filterId);
+    };
 
     return (
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
 
             {/* Header */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.headerAvatarWrap}>
-                        <Sparkles size={16} color="#F4C430" />
-                    </View>
-                    <View>
-                        <Text style={styles.headerTitle}>Style AI</Text>
-                        <Text style={styles.headerSub}>
-                            {wardrobeLoading
-                                ? 'Loading wardrobe…'
-                                : `${wardrobe.length} items ready`}
-                        </Text>
-                    </View>
+                <View>
+                    <Text style={styles.headerTitle}>Quick Fit</Text>
+                    <Text style={styles.headerSub}>
+                        {loading
+                            ? 'Loading your closet…'
+                            : `${closetItems.length} items · ${outfits.length} outfits`}
+                    </Text>
                 </View>
-                <TouchableOpacity style={styles.clearBtn} onPress={clearChat}>
-                    <RefreshCw size={16} color="#999" />
+                <TouchableOpacity
+                    style={[styles.shuffleBtn, generating && styles.shuffleBtnDisabled]}
+                    onPress={() => handleGenerate()}
+                    disabled={generating}
+                    activeOpacity={0.8}
+                >
+                    <Animated.View style={{ transform: [{ rotate: spinDeg }] }}>
+                        <Shuffle size={18} color="#1E293B" />
+                    </Animated.View>
+                    <Text style={styles.shuffleBtnText}>Outfit Generate</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Wardrobe loading bar */}
-            {wardrobeLoading && (
-                <View style={styles.wardrobeLoadingBar}>
-                    <ActivityIndicator size="small" color="#C9960A" />
-                    <Text style={styles.wardrobeLoadingText}>Syncing your wardrobe…</Text>
-                </View>
-            )}
-
-            {/* API key error banner */}
-            {keyError && (
-                <View style={styles.keyErrorBar}>
-                    <Text style={styles.keyErrorText}>
-                        ⚠️  Add Anthropic key in Firestore: <Text style={styles.keyErrorPath}>config / keys → anthropicKey</Text>
+            {/* Style prefs banner */}
+            {stylePrefs && stylePrefs.styles?.length > 0 && (
+                <View style={styles.prefsBanner}>
+                    <Sparkles size={12} color="#2869BD" />
+                    <Text style={styles.prefsBannerText}>
+                        Your style: {stylePrefs.styles.slice(0, 3).join(' · ')}
+                        {stylePrefs.colors?.length
+                            ? `  ·  Colors: ${stylePrefs.colors.slice(0, 3).join(', ')}`
+                            : ''}
                     </Text>
                 </View>
             )}
 
-            <KeyboardAvoidingView
-                style={styles.flex}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={0}
+            {/* ── Filter tabs ── */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+                style={styles.filterScroll}
             >
-                {/* Messages list */}
+                {FILTER_TABS.map(tab => (
+                    <FilterTab
+                        key={tab.id}
+                        tab={tab}
+                        selected={activeFilter === tab.id}
+                        onPress={() => handleFilterChange(tab.id)}
+                    />
+                ))}
+            </ScrollView>
+
+            {/* Body */}
+            {loading ? (
+                <View style={styles.loadingWrap}>
+                    <ActivityIndicator size="large" color="#2869BD" />
+                    <Text style={styles.loadingText}>Syncing your closet…</Text>
+                </View>
+            ) : notEnough ? (
+                <NotEnoughState
+                    filter={activeFilter}
+                    prefs={stylePrefs}
+                    onAdd={() => navigation.navigate('Additem')}
+                />
+            ) : (
                 <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={m => m.id}
-                    contentContainerStyle={styles.messagesList}
+                    data={outfits}
+                    keyExtractor={o => o.id}
+                    contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    onContentSizeChange={scrollToBottom}
-                    renderItem={({ item }) => (
-                        <MessageBubble message={item} wardrobe={wardrobe} />
-                    )}
-                    ListFooterComponent={
-                        showQuickPrompts && !wardrobeLoading ? (
-                            <View style={styles.quickPromptsWrap}>
-                                <Text style={styles.quickPromptsLabel}>Try asking…</Text>
-                                <View style={styles.quickPromptsGrid}>
-                                    {QUICK_PROMPTS.map(p => (
-                                        <PromptChip
-                                            key={p}
-                                            label={p}
-                                            onPress={() => sendMessage(p)}
-                                        />
-                                    ))}
-                                </View>
+                    ListHeaderComponent={
+                        generating ? (
+                            <View style={styles.generatingRow}>
+                                <ActivityIndicator size="small" color="#2869BD" />
+                                <Text style={styles.generatingText}>Finding combinations…</Text>
                             </View>
                         ) : null
                     }
+                    renderItem={({ item, index }) => (
+                        <OutfitCard outfit={item} index={index} />
+                    )}
+                    ListEmptyComponent={
+                        <NotEnoughState
+                            filter={activeFilter}
+                            prefs={stylePrefs}
+                            onAdd={() => navigation.navigate('AddItemScreen')}
+                        />
+                    }
+                    ListFooterComponent={
+                        outfits.length > 0 ? (
+                            <TouchableOpacity
+                                style={styles.reshuffleFooter}
+                                onPress={() => handleGenerate()}
+                                activeOpacity={0.8}
+                            >
+                                <RefreshCw size={14} color="#2869BD" />
+                                <Text style={styles.reshuffleFooterText}>Try different combinations</Text>
+                            </TouchableOpacity>
+                        ) : null
+                    }
                 />
-
-                {/* Input bar */}
-                <SafeAreaView edges={['bottom']} style={styles.inputSafeArea}>
-                    <View style={styles.inputBar}>
-                        <View style={styles.inputWrap}>
-                            <TextInput
-                                style={styles.input}
-                                value={inputText}
-                                onChangeText={setInputText}
-                                placeholder="Ask your stylist…"
-                                placeholderTextColor="#BBBBBB"
-                                multiline
-                                maxLength={500}
-                                returnKeyType="send"
-                                onSubmitEditing={() => sendMessage(inputText)}
-                            />
-                        </View>
-                        <TouchableOpacity
-                            style={[styles.sendBtn, (!inputText.trim() || isThinking) && styles.sendBtnDisabled]}
-                            onPress={() => sendMessage(inputText)}
-                            disabled={!inputText.trim() || isThinking}
-                            activeOpacity={0.8}
-                        >
-                            {isThinking
-                                ? <ActivityIndicator size="small" color="#0a0a0a" />
-                                : <Send size={18} color="#0a0a0a" strokeWidth={2.5} />
-                            }
-                        </TouchableOpacity>
-                    </View>
-                </SafeAreaView>
-            </KeyboardAvoidingView>
+            )}
         </SafeAreaView>
     );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: '#FAFAFA' },
+
+    header: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        justifyContent:    'space-between',
+        paddingHorizontal: 20,
+        paddingVertical:   14,
+    },
+    headerTitle: {
+        fontSize:      22,
+        fontFamily:    'InterBold',
+        fontWeight:    '700',
+        color:         '#0F172A',
+        letterSpacing: -0.5,
+    },
+    headerSub: {
+        fontSize:   12,
+        fontFamily: 'InterRegular',
+        color:      '#94A3B8',
+        marginTop:   2,
+    },
+
+    shuffleBtn: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        gap:               6,
+        backgroundColor:   '#F1F5F9',
+        paddingHorizontal: 14,
+        paddingVertical:    9,
+        borderRadius:      24,
+        borderWidth:        1,
+        borderColor:       '#E2E8F0',
+    },
+    shuffleBtnDisabled: { opacity: 0.5 },
+    shuffleBtnText: {
+        fontSize:   13,
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+        color:      '#1E293B',
+    },
+
+    prefsBanner: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        gap:               6,
+        marginHorizontal:  20,
+        marginBottom:       8,
+        backgroundColor:   '#EBF1FB',
+        paddingHorizontal: 12,
+        paddingVertical:    7,
+        borderRadius:      10,
+    },
+    prefsBannerText: {
+        fontSize:      12,
+        fontFamily:    'InterMedium',
+        color:         '#2869BD',
+        fontWeight:    '500',
+        textTransform: 'capitalize',
+        flexShrink:     1,
+    },
+
+    // ── Filter tabs — clean, text-only, fixed height ──────────────────────────
+    filterScroll: {
+        flexGrow:  0,
+        flexShrink: 0,
+    },
+    filterRow: {
+        paddingHorizontal: 16,
+        paddingVertical:   10,
+        gap:                8,
+        flexDirection:     'row',
+        alignItems:        'center',
+    },
+    filterTab: {
+        height:            36,
+        paddingHorizontal: 16,
+        borderRadius:      18,
+        backgroundColor:   '#F1F5F9',
+        borderWidth:        1.5,
+        borderColor:       '#E2E8F0',
+        alignItems:        'center',
+        justifyContent:    'center',
+    },
+    filterTabSelected: {
+        backgroundColor: '#EBF1FB',
+        borderColor:     '#2869BD',
+    },
+    filterTabLabel: {
+        fontSize:   13,
+        fontFamily: 'InterMedium',
+        fontWeight: '500',
+        color:      '#64748B',
+        lineHeight: 16,
+    },
+    filterTabLabelSelected: {
+        color:      '#2869BD',
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+    },
+
+    loadingWrap: {
+        flex:           1,
+        alignItems:     'center',
+        justifyContent: 'center',
+        gap:            12,
+    },
+    loadingText: {
+        fontSize:   14,
+        fontFamily: 'InterRegular',
+        color:      '#94A3B8',
+    },
+
+    generatingRow: {
+        flexDirection:   'row',
+        alignItems:      'center',
+        justifyContent:  'center',
+        gap:             8,
+        paddingVertical: 12,
+    },
+    generatingText: {
+        fontSize:   13,
+        fontFamily: 'InterMedium',
+        color:      '#94A3B8',
+    },
+
+    listContent: {
+        paddingHorizontal: 16,
+        paddingTop:         8,
+        paddingBottom:     40,
+        gap:               16,
+    },
+
+    outfitCardHeader: {
+        flexDirection:   'row',
+        alignItems:      'center',
+        justifyContent:  'space-between',
+        marginBottom:    14,
+    },
+    outfitHeaderLeft: {
+        flexDirection: 'row',
+        alignItems:    'center',
+        gap:           10,
+    },
+    outfitIndexBadge: {
+        width:           28,
+        height:          28,
+        borderRadius:    14,
+        backgroundColor: '#EBF1FB',
+        alignItems:      'center',
+        justifyContent:  'center',
+    },
+    outfitIndexText: {
+        fontSize:   13,
+        fontFamily: 'InterBold',
+        fontWeight: '700',
+        color:      '#2869BD',
+    },
+    outfitName: {
+        fontSize:   15,
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+        color:      '#0F172A',
+    },
+    outfitOccasion: {
+        fontSize:   12,
+        fontFamily: 'InterRegular',
+        color:      '#94A3B8',
+        marginTop:   1,
+    },
+
+    outfitItemsGrid: {
+        flexDirection: 'row',
+        flexWrap:      'wrap',
+        gap:           CARD_GAP,
+    },
+
+    reshuffleFooter: {
+        flexDirection:   'row',
+        alignItems:      'center',
+        justifyContent:  'center',
+        gap:             6,
+        marginTop:        8,
+        paddingVertical: 14,
+    },
+    reshuffleFooterText: {
+        fontSize:   13,
+        fontFamily: 'InterMedium',
+        fontWeight: '500',
+        color:      '#2869BD',
+    },
+
+    emptyState: {
+        flex:              1,
+        alignItems:        'center',
+        justifyContent:    'center',
+        paddingHorizontal: 40,
+        paddingVertical:   60,
+        gap:               14,
+    },
+    emptyIconWrap: {
+        width:           80,
+        height:          80,
+        borderRadius:    40,
+        backgroundColor: '#F1F5F9',
+        alignItems:      'center',
+        justifyContent:  'center',
+        marginBottom:     4,
+    },
+    emptyTitle: {
+        fontSize:   16,
+        fontFamily: 'InterBold',
+        fontWeight: '700',
+        color:      '#1E293B',
+        textAlign:  'center',
+        lineHeight: 22,
+    },
+    emptyMsg: {
+        fontSize:   13,
+        fontFamily: 'InterRegular',
+        color:      '#94A3B8',
+        textAlign:  'center',
+        lineHeight: 19,
+    },
+    addBtn: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        gap:               8,
+        backgroundColor:   '#2869BD',
+        paddingHorizontal: 20,
+        paddingVertical:   12,
+        borderRadius:      14,
+        marginTop:          8,
+    },
+    addBtnText: {
+        fontSize:   14,
+        fontFamily: 'InterSemiBold',
+        fontWeight: '600',
+        color:      '#FFFFFF',
+    },
+});
+
+const cardStyles = StyleSheet.create({
+    card: {
+        width:           CARD_WIDTH,
+        backgroundColor: '#fff',
+        borderRadius:    16,
+        overflow:        'hidden',
+        shadowColor:     '#1e293b',
+        shadowOffset:    { width: 0, height: 2 },
+        shadowOpacity:   0.07,
+        shadowRadius:    8,
+        elevation:        3,
+    },
+    imageWrapper: {
+        width:           '100%',
+        height:          CARD_WIDTH,
+        backgroundColor: '#f1f5f9',
+    },
+    image:       { width: '100%', height: '100%' },
+    imageFallback: {
+        width:           '100%',
+        height:          '100%',
+        alignItems:      'center',
+        justifyContent:  'center',
+        backgroundColor: '#f1f5f9',
+    },
+    info: {
+        paddingHorizontal: 10,
+        paddingTop:         8,
+        paddingBottom:     10,
+    },
+    title: {
+        fontSize:     13,
+        fontWeight:   '600',
+        color:        '#0f172a',
+        marginBottom:  4,
+    },
+    metaRow: {
+        flexDirection:  'row',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+    },
+    meta: {
+        fontSize:   11,
+        color:      '#94a3b8',
+        fontWeight: '400',
+        flexShrink:  1,
+        marginRight: 6,
+    },
+    badge: {
+        flexDirection:     'row',
+        alignItems:        'center',
+        gap:               3,
+        backgroundColor:   '#fef2f2',
+        borderRadius:      99,
+        paddingHorizontal: 6,
+        paddingVertical:    2,
+    },
+    badgeText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+});
 
 export default AIChatScreen;

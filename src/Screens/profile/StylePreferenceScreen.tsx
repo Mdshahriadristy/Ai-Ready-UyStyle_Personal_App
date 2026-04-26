@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,9 +6,23 @@ import {
     TouchableOpacity,
     StatusBar,
     StyleSheet,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
+
+// ─── Firebase Modular v22 imports ─────────────────────────────────────────────
+import { getApp } from '@react-native-firebase/app';
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
+    serverTimestamp,
+} from '@react-native-firebase/firestore';
+import { getAuth } from '@react-native-firebase/auth';
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface StyleCategory {
     id: string;
@@ -29,50 +43,155 @@ interface ColorItem {
 }
 
 const styleCategories: StyleCategory[] = [
-    { id: 'casual', title: 'Casual', description: 'Everyday relaxed looks', emoji: '👕' },
-    { id: 'formal', title: 'Formal', description: 'Professional & polished', emoji: '👔' },
-    { id: 'gym', title: 'Gym', description: 'Active & sporty wear', emoji: '🏋️' },
-    { id: 'streetwear', title: 'Streetwear', description: 'Urban & trendy styles', emoji: '🧢' },
-    { id: 'boho', title: 'Boho', description: 'Free-spirited & artistic', emoji: '🌸' },
+    { id: 'casual',     title: 'Casual',     description: 'Everyday relaxed looks',   emoji: '👕' },
+    { id: 'formal',     title: 'Formal',     description: 'Professional & polished',  emoji: '👔' },
+    { id: 'gym',        title: 'Gym',        description: 'Active & sporty wear',     emoji: '🏋️' },
+    { id: 'streetwear', title: 'Streetwear', description: 'Urban & trendy styles',    emoji: '🧢' },
+    { id: 'boho',       title: 'Boho',       description: 'Free-spirited & artistic', emoji: '🌸' },
     { id: 'minimalist', title: 'Minimalist', description: 'Clean & simple aesthetic', emoji: '⬜' },
 ];
 
 const occasions: OccasionItem[] = [
-    { id: 'work', label: 'Work' },
-    { id: 'date', label: 'Date Night' },
-    { id: 'weekend', label: 'Weekend' },
-    { id: 'party', label: 'Party' },
-    { id: 'travel', label: 'Travel' },
-    { id: 'outdoor', label: 'Outdoor' },
-    { id: 'brunch', label: 'Brunch' },
-    { id: 'gym', label: 'Gym' },
+    { id: 'work',    label: 'Work'      },
+    { id: 'date',    label: 'Date Night' },
+    { id: 'weekend', label: 'Weekend'   },
+    { id: 'party',   label: 'Party'     },
+    { id: 'travel',  label: 'Travel'    },
+    { id: 'outdoor', label: 'Outdoor'   },
+    { id: 'brunch',  label: 'Brunch'    },
+    { id: 'gym',     label: 'Gym'       },
 ];
 
 const colors: ColorItem[] = [
     { id: 'black', color: '#1a1a1a', label: 'Black' },
     { id: 'white', color: '#f5f5f5', label: 'White' },
-    { id: 'navy', color: '#1e3a5f', label: 'Navy' },
+    { id: 'navy',  color: '#1e3a5f', label: 'Navy'  },
     { id: 'beige', color: '#d4b896', label: 'Beige' },
-    { id: 'grey', color: '#9ca3af', label: 'Grey' },
+    { id: 'grey',  color: '#9ca3af', label: 'Grey'  },
     { id: 'green', color: '#4ade80', label: 'Green' },
-    { id: 'red', color: '#ef4444', label: 'Red' },
+    { id: 'red',   color: '#ef4444', label: 'Red'   },
     { id: 'brown', color: '#92400e', label: 'Brown' },
 ];
 
 const StylePreferenceScreen = ({ navigation }: any) => {
     const onBack = () => navigation.goBack();
-    const [selectedStyles, setSelectedStyles] = useState<string[]>(['casual', 'gym', 'formal']);
-    const [selectedOccasions, setSelectedOccasions] = useState<string[]>(['work', 'weekend']);
-    const [selectedColors, setSelectedColors] = useState<string[]>(['black', 'navy']);
 
-    const toggleItem = (id: string, selected: string[], setSelected: (val: string[]) => void) => {
-        if (selected.includes(id)) {
-            setSelected(selected.filter(s => s !== id));
-        } else {
-            setSelected([...selected, id]);
+    const [selectedStyles,    setSelectedStyles]    = useState<string[]>([]);
+    const [selectedOccasions, setSelectedOccasions] = useState<string[]>([]);
+    const [selectedColors,    setSelectedColors]    = useState<string[]>([]);
+
+    const [loading, setLoading] = useState(true);
+    const [saving,  setSaving]  = useState(false);
+    const [saved,   setSaved]   = useState(false);
+
+    // ─── Firestore doc reference (Modular v22) ────────────────────────────────
+    const getUserDocRef = () => {
+        const app  = getApp();
+        const user = getAuth(app).currentUser;
+        if (!user) throw new Error('User not authenticated');
+        const db = getFirestore(app);
+        // Path: stylePrefs/{uid}  → separate top-level collection
+        return doc(db, 'stylePrefs', user.uid);
+    };
+
+    // ─── Toggle helper ────────────────────────────────────────────────────────
+    const toggleItem = (
+        id: string,
+        selected: string[],
+        setSelected: (val: string[]) => void,
+    ) => {
+        setSelected(
+            selected.includes(id)
+                ? selected.filter(s => s !== id)
+                : [...selected, id],
+        );
+    };
+
+    // ─── Fetch existing preferences on mount ──────────────────────────────────
+    useEffect(() => {
+        const fetchPreferences = async () => {
+            try {
+                const docRef  = getUserDocRef();
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data?.styles)    setSelectedStyles(data.styles);
+                    if (data?.occasions) setSelectedOccasions(data.occasions);
+                    if (data?.colors)    setSelectedColors(data.colors);
+                }
+            } catch (error: any) {
+                console.error('Error fetching preferences:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPreferences();
+    }, []);
+
+    // ─── Save to Firestore ────────────────────────────────────────────────────
+    const handleSave = async () => {
+        if (saving) return;
+
+        if (selectedStyles.length === 0) {
+            Alert.alert('Style Required', 'Please select at least one style.');
+            return;
+        }
+        if (selectedOccasions.length === 0) {
+            Alert.alert('Occasion Required', 'Please select at least one occasion.');
+            return;
+        }
+        if (selectedColors.length === 0) {
+            Alert.alert('Color Required', 'Please select at least one color.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const docRef = getUserDocRef();
+
+            await setDoc(
+                docRef,
+                {
+                    styles:    selectedStyles,
+                    occasions: selectedOccasions,
+                    colors:    selectedColors,
+                    updatedAt: serverTimestamp(),
+                },
+                { merge: true },
+            );
+
+            setSaved(true);
+            setTimeout(() => {
+                setSaved(false);
+                navigation.goBack();
+            }, 800);
+
+        } catch (error: any) {
+            console.error('Error saving preferences:', error);
+            Alert.alert(
+                'Save Failed',
+                error?.message ?? 'Something went wrong. Please try again.',
+            );
+        } finally {
+            setSaving(false);
         }
     };
 
+    // ─── Loading state ────────────────────────────────────────────────────────
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#2869BD" />
+                    <Text style={styles.loadingText}>Loading preferences…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ─── UI ───────────────────────────────────────────────────────────────────
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -83,8 +202,10 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                     <ArrowLeft size={22} color="#1E293B" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Style Preferences</Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={onBack}>
-                    <Text style={styles.saveText}>Save</Text>
+                <TouchableOpacity activeOpacity={0.7} onPress={handleSave} disabled={saving}>
+                    <Text style={[styles.saveText, saving && styles.saveTextDisabled]}>
+                        {saved ? 'Saved ✓' : saving ? 'Saving…' : 'Save'}
+                    </Text>
                 </TouchableOpacity>
             </View>
 
@@ -92,7 +213,7 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Style Section */}
+                {/* ── Style Section ── */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Your Style</Text>
                     <Text style={styles.sectionSub}>Select all that match your vibe</Text>
@@ -111,6 +232,7 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                                             <Check size={10} color="#fff" />
                                         </View>
                                     )}
+                                    <Text style={styles.styleEmoji}>{item.emoji}</Text>
                                     <Text style={[styles.styleCardTitle, isSelected && styles.styleCardTitleSelected]}>
                                         {item.title}
                                     </Text>
@@ -123,7 +245,7 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                     </View>
                 </View>
 
-                {/* Occasions Section */}
+                {/* ── Occasions Section ── */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Occasions</Text>
                     <Text style={styles.sectionSub}>When do you need outfit inspiration?</Text>
@@ -146,7 +268,7 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                     </View>
                 </View>
 
-                {/* Favorite Colors Section */}
+                {/* ── Favorite Colors Section ── */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Favorite Colors</Text>
                     <Text style={styles.sectionSub}>Pick your go-to palette</Text>
@@ -165,7 +287,9 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                                         { backgroundColor: item.color },
                                         isSelected && styles.colorCircleSelected,
                                     ]}>
-                                        {isSelected && <Check size={14} color={item.id === 'white' ? '#1E293B' : '#fff'} />}
+                                        {isSelected && (
+                                            <Check size={14} color={item.id === 'white' ? '#1E293B' : '#fff'} />
+                                        )}
                                     </View>
                                     <Text style={[styles.colorLabel, isSelected && styles.colorLabelSelected]}>
                                         {item.label}
@@ -176,22 +300,43 @@ const StylePreferenceScreen = ({ navigation }: any) => {
                     </View>
                 </View>
 
-                {/* Save Button */}
-                <TouchableOpacity style={styles.saveBtn} activeOpacity={0.85} onPress={onBack}>
-                    <Text style={styles.saveBtnText}>Save Preferences</Text>
+                {/* ── Save Button ── */}
+                <TouchableOpacity
+                    style={[styles.saveBtn, (saving || saved) && styles.saveBtnDisabled]}
+                    activeOpacity={0.85}
+                    onPress={handleSave}
+                    disabled={saving || saved}
+                >
+                    {saving ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Text style={styles.saveBtnText}>
+                            {saved ? 'Saved ✓' : 'Save Preferences'}
+                        </Text>
+                    )}
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
         backgroundColor: '#fff',
     },
-
-    // Header — matches ProfileEditScreen exactly
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#94a3b8',
+        fontFamily: 'InterRegular',
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -218,12 +363,12 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#2869BD',
     },
-
+    saveTextDisabled: {
+        color: '#94a3b8',
+    },
     scrollContent: {
         paddingBottom: 40,
     },
-
-    // Section
     section: {
         paddingHorizontal: 20,
         paddingTop: 24,
@@ -242,8 +387,6 @@ const styles = StyleSheet.create({
         marginTop: 3,
         marginBottom: 16,
     },
-
-    // Style Grid
     styleGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -251,7 +394,7 @@ const styles = StyleSheet.create({
     },
     styleCard: {
         width: '47%',
-        backgroundColor: '#F3F4F6',   // same as input bg in ProfileEditScreen
+        backgroundColor: '#F3F4F6',
         borderRadius: 16,
         padding: 16,
         borderWidth: 1.5,
@@ -296,8 +439,6 @@ const styles = StyleSheet.create({
     styleCardDescSelected: {
         color: '#5a8fd4',
     },
-
-    // Chips
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -307,7 +448,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 9,
         borderRadius: 50,
-        backgroundColor: '#F3F4F6',   // same as input bg in ProfileEditScreen
+        backgroundColor: '#F3F4F6',
         borderWidth: 1.5,
         borderColor: '#F3F4F6',
     },
@@ -319,15 +460,13 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontFamily: 'InterMedium',
         fontWeight: '500',
-        color: '#565E74',             // same as fieldLabel in ProfileEditScreen
+        color: '#565E74',
     },
     chipTextSelected: {
         fontFamily: 'InterSemiBold',
         fontWeight: '600',
         color: '#2869BD',
     },
-
-    // Colors
     colorRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -365,8 +504,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#2869BD',
     },
-
-    // Save Button — matches ProfileEditScreen exactly
     saveBtn: {
         marginHorizontal: 20,
         marginTop: 32,
@@ -374,6 +511,11 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         paddingVertical: 15,
         alignItems: 'center',
+        minHeight: 50,
+        justifyContent: 'center',
+    },
+    saveBtnDisabled: {
+        backgroundColor: '#93b8e8',
     },
     saveBtnText: {
         fontSize: 14,
