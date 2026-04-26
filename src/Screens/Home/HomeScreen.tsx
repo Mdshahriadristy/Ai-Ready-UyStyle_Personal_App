@@ -289,7 +289,7 @@ const HomeScreen = () => {
                             <Text style={styles.sectionTitle}>Recent Items</Text>
                             <TouchableOpacity
                                 style={styles.seeAll}
-                                onPress={() => navigation.navigate('closet')}
+                                onPress={() => navigation.navigate('Recentitems')}
                             >
                                 <Text style={styles.seeAllText}>See All</Text>
                                 <ChevronRight size={14} color="#65758B" />

@@ -1,88 +1,3 @@
-// import React from 'react';
-// import {
-//     View,
-//     Text,
-//     TouchableOpacity,
-//     StatusBar,
-// } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { ArrowUpFromLine, Camera, Image as ImageIcon } from 'lucide-react-native';
-// import { styles } from './style';
-
-// const AdditemScreen = () => {
-
-//     const handleTakePhoto = () => {
-//         console.log('Take photo');
-//     };
-
-//     const handleChooseGallery = () => {
-//         console.log('Choose from gallery');
-//     };
-
-//     return (
-//         <SafeAreaView style={styles.safeArea}>
-//             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
-//             {/* Header */}
-//             <View style={styles.header}>
-//                 <Text style={styles.headerTitle}>Add New Item</Text>
-//             </View>
-
-//             <View style={styles.container}>
-//                 {/* Subtitle */}
-//                 <Text style={styles.subtitle}>
-//                     Upload a clothing piece to add it to your closet.
-//                 </Text>
-
-//                 {/* Upload Box */}
-//                 <TouchableOpacity
-//                     style={styles.uploadBox}
-//                     activeOpacity={0.8}
-//                     onPress={handleChooseGallery}
-//                 >
-//                     <View style={styles.uploadIconWrapper}>
-//                         <ArrowUpFromLine size={26} color="#fff" />
-//                     </View>
-//                     <Text style={styles.uploadTitle}>Tap to upload photo</Text>
-//                     <Text style={styles.uploadSub}>Take a photo or choose from gallery</Text>
-//                 </TouchableOpacity>
-
-//                 {/* Options */}
-//                 <TouchableOpacity
-//                     style={[styles.optionRow, styles.primeryButton]}
-//                     onPress={handleTakePhoto}
-//                     activeOpacity={0.8}
-//                 >
-//                     <View style={[styles.optionIcon, styles.primeryButtonIcon]}>
-//                         <Camera size={20} color="#fff" />
-//                     </View>
-//                     <Text style={[styles.optionText, styles.primeryButtonText]}>Take Photo</Text>
-//                 </TouchableOpacity>
-
-//                 <TouchableOpacity
-//                     style={styles.optionRow}
-//                     onPress={handleChooseGallery}
-//                     activeOpacity={0.8}
-//                 >
-//                     <View style={styles.optionIcon}>
-//                         <ImageIcon size={20} color="#fff" />
-//                     </View>
-//                     <Text style={styles.optionText}>Choose from Gallery</Text>
-//                 </TouchableOpacity>
-
-//             </View>
-//         </SafeAreaView>
-//     );
-// };
-
-
-
-// export default AdditemScreen;
-
-
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -98,7 +13,7 @@ import {
     ActionSheetIOS,
     Animated,
     Keyboard,
-    Modal,
+    PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -107,7 +22,6 @@ import {
     Image as ImageIcon,
     X,
     Plus,
-    Pencil,
     Check,
     XIcon,
 } from 'lucide-react-native';
@@ -130,7 +44,6 @@ import {
     deleteDoc,
     doc,
     updateDoc,
-    getDocs,
 } from '@react-native-firebase/firestore';
 import {
     getStorage,
@@ -139,17 +52,16 @@ import {
     getDownloadURL,
 } from '@react-native-firebase/storage';
 
-// ─── Default built-in categories (not editable/deletable) ─────────────────────
+// ─── Default built-in categories ─────────────────────────────────────────────
 const DEFAULT_CATEGORIES = ['Tops', 'Bottoms', 'Shoes', 'Outerwear', 'Accessories', 'Others'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Category {
-    id: string;          // Firestore doc id ('' for defaults)
+    id: string;
     name: string;
     isCustom: boolean;
 }
 
-// ─── Inline card for creating / editing a category ───────────────────────────
 interface CategoryCardProps {
     visible: boolean;
     initialValue?: string;
@@ -159,6 +71,7 @@ interface CategoryCardProps {
     mode: 'create' | 'edit';
 }
 
+// ─── CategoryCard ─────────────────────────────────────────────────────────────
 const CategoryCard: React.FC<CategoryCardProps> = ({
     visible, initialValue = '', onSubmit, onCancel, loading, mode,
 }) => {
@@ -210,7 +123,6 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
                 onSubmitEditing={() => value.trim() && onSubmit(value.trim())}
             />
             <Text style={categoryCardStyles.charCount}>{value.length}/30</Text>
-
             <View style={categoryCardStyles.cardActions}>
                 <TouchableOpacity
                     style={categoryCardStyles.cancelBtn}
@@ -219,7 +131,6 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
                 >
                     <Text style={categoryCardStyles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                     style={[
                         categoryCardStyles.confirmBtn,
@@ -244,24 +155,66 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
     );
 };
 
+// ─── Camera Permission Helper ─────────────────────────────────────────────────
+/**
+ * Checks and requests camera permission on both iOS and Android.
+ * Returns true if permission is granted, false otherwise.
+ */
+const requestCameraPermission = async (): Promise<boolean> => {
+    try {
+        if (Platform.OS === 'android') {
+            // Android: use PermissionsAndroid directly (works without react-native-permissions too)
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.CAMERA,
+                {
+                    title: 'Camera Permission',
+                    message: 'Closet needs access to your camera to take photos of clothing items.',
+                    buttonNeutral: 'Ask Me Later',
+                    buttonNegative: 'Deny',
+                    buttonPositive: 'Allow',
+                },
+            );
+            if (granted === PermissionsAndroid.RESULTS.GRANTED) return true;
+
+            // User denied — show guidance
+            Alert.alert(
+                'Camera Access Denied',
+                'To take photos, go to Settings → Apps → [App Name] → Permissions → Camera and enable it.',
+                [{ text: 'OK' }],
+            );
+            return false;
+        }
+
+        // iOS: react-native-image-picker handles the permission dialog automatically
+        // on first launch. If the user previously denied it we guide them to Settings.
+        // We detect denial by attempting a launch with a very short timeout trick —
+        // instead, we just let launchCamera handle it and rely on didCancel / errorCode.
+        // Nothing extra needed here for iOS.
+        return true;
+    } catch (err) {
+        console.warn('[Camera Permission]', err);
+        return false;
+    }
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const AdditemScreen = () => {
-    // ── Image state ──────────────────────────────────────────────────────────
+    // ── Image state
     const [imageUri,  setImageUri]  = useState<string | null>(null);
     const [imageFile, setImageFile] = useState<any>(null);
 
-    // ── Form state ───────────────────────────────────────────────────────────
+    // ── Form state
     const [title,    setTitle]    = useState('');
     const [category, setCategory] = useState('');
     const [color,    setColor]    = useState('');
 
-    // ── Category state ───────────────────────────────────────────────────────
-    const [categories,       setCategories]       = useState<Category[]>([]);
-    const [showCreateCard,   setShowCreateCard]   = useState(false);
-    const [editingCategory,  setEditingCategory]  = useState<Category | null>(null);
-    const [categoryLoading,  setCategoryLoading]  = useState(false);
+    // ── Category state
+    const [categories,      setCategories]      = useState<Category[]>([]);
+    const [showCreateCard,  setShowCreateCard]  = useState(false);
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [categoryLoading, setCategoryLoading] = useState(false);
 
-    // ── Upload state ─────────────────────────────────────────────────────────
+    // ── Upload state
     const [uploading, setUploading] = useState(false);
     const [uploadPct, setUploadPct] = useState(0);
 
@@ -270,56 +223,40 @@ const AdditemScreen = () => {
     const db   = getFirestore(app);
     const user = auth.currentUser;
 
-    // ── defaults + Firestore custom categories ─────────────
+    // ── Fetch categories from Firestore
     useEffect(() => {
         if (!user) return;
-
-        const q = query(
-            collection(db, 'categories'),
-            where('userId', '==', user.uid),
-        );
-
+        const q = query(collection(db, 'categories'), where('userId', '==', user.uid));
         const unsub = onSnapshot(q, (snapshot) => {
             const defaults: Category[] = DEFAULT_CATEGORIES.map(name => ({
                 id: '', name, isCustom: false,
             }));
-
             const custom: Category[] = snapshot.docs.map(d => ({
                 id: d.id,
                 name: d.data().name as string,
                 isCustom: true,
             }));
-
             setCategories([...defaults, ...custom]);
         });
-
         return () => unsub();
     }, [user]);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    const allCategoryNames = () => categories.map(c => c.name.toLowerCase());
-
+    // ── Helpers
     const isDuplicate = (name: string, excludeId?: string) =>
         categories.some(
             c => c.name.toLowerCase() === name.toLowerCase() && c.id !== (excludeId ?? '__never__'),
         );
 
-    // ── Create category ───────────────────────────────────────────────────────
+    // ── Create category
     const handleCreateCategory = async (name: string) => {
-        if (isDuplicate(name)) {
-            Alert.alert('Duplicate', `"${name}" already exists.`);
-            return;
-        }
+        if (isDuplicate(name)) { Alert.alert('Duplicate', `"${name}" already exists.`); return; }
         if (!user) return;
-
         setCategoryLoading(true);
         try {
-            const docRef = await addDoc(collection(db, 'categories'), {
-                userId:    user.uid,
-                name:      name.trim(),
-                createdAt: serverTimestamp(),
+            await addDoc(collection(db, 'categories'), {
+                userId: user.uid, name: name.trim(), createdAt: serverTimestamp(),
             });
-            setCategory(name.trim());  
+            setCategory(name.trim());
             setShowCreateCard(false);
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -328,19 +265,13 @@ const AdditemScreen = () => {
         }
     };
 
-    // ── Edit category ────────────────────────────────────────────────────────
+    // ── Edit category
     const handleEditCategory = async (name: string) => {
         if (!editingCategory) return;
-        if (isDuplicate(name, editingCategory.id)) {
-            Alert.alert('Duplicate', `"${name}" already exists.`);
-            return;
-        }
-
+        if (isDuplicate(name, editingCategory.id)) { Alert.alert('Duplicate', `"${name}" already exists.`); return; }
         setCategoryLoading(true);
         try {
-            await updateDoc(doc(db, 'categories', editingCategory.id), {
-                name: name.trim(),
-            });
+            await updateDoc(doc(db, 'categories', editingCategory.id), { name: name.trim() });
             if (category === editingCategory.name) setCategory(name.trim());
             setEditingCategory(null);
         } catch (e: any) {
@@ -350,7 +281,7 @@ const AdditemScreen = () => {
         }
     };
 
-    // ── Delete category ───────────────────────────────────────────────────────
+    // ── Delete category
     const confirmDelete = (cat: Category) => {
         Alert.alert(
             'Delete Category',
@@ -358,8 +289,7 @@ const AdditemScreen = () => {
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Delete',
-                    style: 'destructive',
+                    text: 'Delete', style: 'destructive',
                     onPress: async () => {
                         try {
                             await deleteDoc(doc(db, 'categories', cat.id));
@@ -373,26 +303,49 @@ const AdditemScreen = () => {
         );
     };
 
-    // ── Image Picker ──────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Camera — request permission first, then launch
+    // ─────────────────────────────────────────────────────────────────────────
+    const openCamera = async () => {
+        const allowed = await requestCameraPermission();
+        if (!allowed) return;
+
+        launchCamera(
+            {
+                mediaType: 'photo',
+                saveToPhotos: false,
+                quality: 1,           // PhotoQuality only accepts 0|0.1|0.2…|1
+                cameraType: 'back',
+            },
+            handleImageResponse,
+        );
+    };
+
+    const openGallery = () =>
+        launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 1 }, handleImageResponse);
+
+    // ── Show action sheet / alert to choose source
     const handleAddImage = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
-                { options: [ '📁 Choose from Gallery'], cancelButtonIndex: 0 },
+                {
+                    // index 0 = Cancel (destructive-ish), 1 = Take Photo, 2 = Gallery
+                    options: ['Cancel', '📷 Take Photo', '📁 Choose from Gallery'],
+                    cancelButtonIndex: 0,
+                },
                 (index) => {
-                 
+                    if (index === 1) openCamera();
                     if (index === 2) openGallery();
-                }
+                },
             );
         } else {
             Alert.alert('Add Photo', 'Choose an option', [
-                { text: 'Cancel',                  style: 'cancel' },
+                { text: 'Cancel',                 style: 'cancel' },
+                { text: '📷 Take Photo',           onPress: openCamera },
                 { text: '📁 Choose from Gallery',  onPress: openGallery },
             ]);
         }
     };
-
-    const openCamera  = () => launchCamera(  { mediaType: 'photo', saveToPhotos: false }, handleImageResponse);
-    const openGallery = () => launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 }, handleImageResponse);
 
     const handleImageResponse = (response: ImagePickerResponse) => {
         if (response.didCancel || response.errorCode) return;
@@ -402,7 +355,7 @@ const AdditemScreen = () => {
 
     const clearImage = () => { setImageUri(null); setImageFile(null); };
 
-    // ── Upload to Storage ─────────────────────────────────────────────────────
+    // ── Upload image to Firebase Storage
     const uploadImage = async (uid: string): Promise<string> => {
         const storage  = getStorage(app);
         const fileRef  = ref(storage, `closet/${uid}/${Date.now()}.jpg`);
@@ -423,25 +376,25 @@ const AdditemScreen = () => {
         });
     };
 
-    // ── Validation ────────────────────────────────────────────────────────────
+    // ── Validate form
     const validate = (): boolean => {
-        if (!imageUri)      { Alert.alert('Required', 'Please select an image first.');        return false; }
-        if (!title.trim())  { Alert.alert('Required', 'Please enter a title for the item.');   return false; }
-        if (!category)      { Alert.alert('Required', 'Please select or create a category.');  return false; }
+        if (!imageUri)     { Alert.alert('Required', 'Please select an image first.');       return false; }
+        if (!title.trim()) { Alert.alert('Required', 'Please enter a title for the item.');  return false; }
+        if (!category)     { Alert.alert('Required', 'Please select or create a category.'); return false; }
         return true;
     };
 
-    // ── Save item ─────────────────────────────────────────────────────────────
+    // ── Save item to Firestore
     const handleSave = async () => {
         if (!validate() || !user) return;
         setUploading(true);
         try {
             const imageURL = await uploadImage(user.uid);
             await addDoc(collection(db, 'closetItems'), {
-                userId:    user.uid,
-                title:     title.trim(),
+                userId: user.uid,
+                title:  title.trim(),
                 category,
-                color:     color.trim(),
+                color:  color.trim(),
                 imageURL,
                 createdAt: serverTimestamp(),
             });
@@ -465,7 +418,6 @@ const AdditemScreen = () => {
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-            {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Add New Item</Text>
             </View>
@@ -504,7 +456,12 @@ const AdditemScreen = () => {
                     {/* ── Camera / Gallery Buttons ── */}
                     {!imageUri && (
                         <>
-                            <TouchableOpacity style={[styles.optionRow, styles.primeryButton]} onPress={openCamera} activeOpacity={0.8}>
+                            {/* Take Photo button — requests permission before opening camera */}
+                            <TouchableOpacity
+                                style={[styles.optionRow, styles.primeryButton]}
+                                onPress={openCamera}
+                                activeOpacity={0.8}
+                            >
                                 <View style={[styles.optionIcon, styles.primeryButtonIcon]}>
                                     <Camera size={20} color="#fff" />
                                 </View>
@@ -539,7 +496,7 @@ const AdditemScreen = () => {
                                 />
                             </View>
 
-                            {/* ── Category Section ── */}
+                            {/* Category */}
                             <View style={styles.fieldGroup}>
                                 <View style={categoryStyles.labelRow}>
                                     <Text style={styles.fieldLabel}>
@@ -550,7 +507,6 @@ const AdditemScreen = () => {
                                     )}
                                 </View>
 
-                                {/* Chip grid */}
                                 <View style={styles.categoryRow}>
                                     {categories.map((cat) => (
                                         <View key={cat.id || cat.name} style={categoryStyles.chipWrapper}>
@@ -575,7 +531,6 @@ const AdditemScreen = () => {
                                                 </Text>
                                             </TouchableOpacity>
 
-                                            {/* Edit / Delete icons — custom categories only */}
                                             {cat.isCustom && (
                                                 <View style={categoryStyles.chipActions}>
                                                     <TouchableOpacity
@@ -590,7 +545,6 @@ const AdditemScreen = () => {
                                         </View>
                                     ))}
 
-                                    {/* + Create New Category chip */}
                                     <TouchableOpacity
                                         style={[
                                             categoryStyles.createChip,
@@ -602,7 +556,7 @@ const AdditemScreen = () => {
                                         }}
                                         activeOpacity={0.75}
                                     >
-                                        <Plus size={15} color={showCreateCard ? '#fff' : '#0f172a'}  />
+                                        <Plus size={15} color={showCreateCard ? '#fff' : '#0f172a'} />
                                         <Text style={[
                                             categoryStyles.createChipText,
                                             showCreateCard && categoryStyles.createChipTextActive,
@@ -612,7 +566,6 @@ const AdditemScreen = () => {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* ── Inline Create Card ── */}
                                 <CategoryCard
                                     visible={showCreateCard}
                                     mode="create"
@@ -621,7 +574,6 @@ const AdditemScreen = () => {
                                     loading={categoryLoading}
                                 />
 
-                                {/* ── Inline Edit Card ── */}
                                 <CategoryCard
                                     visible={!!editingCategory}
                                     mode="edit"
@@ -639,12 +591,12 @@ const AdditemScreen = () => {
                                     style={styles.input}
                                     value={color}
                                     onChangeText={setColor}
-                                    placeholder="Blue"
+                                    placeholder="e.g. Blue"
                                     placeholderTextColor="#94a3b8"
                                 />
                             </View>
 
-                            {/* Save Button */}
+                            {/* Save */}
                             <TouchableOpacity
                                 style={[styles.saveBtn, uploading && styles.saveBtnDisabled]}
                                 onPress={handleSave}
@@ -674,7 +626,7 @@ const AdditemScreen = () => {
 
 export default AdditemScreen;
 
-// ─── Local styles for category feature ───────────────────────────────────────
+// ─── Local styles ─────────────────────────────────────────────────────────────
 import { StyleSheet } from 'react-native';
 
 const categoryStyles = StyleSheet.create({
@@ -694,7 +646,7 @@ const categoryStyles = StyleSheet.create({
         fontWeight: '600',
     },
     chip: {
-        marginBottom: 0,   
+        marginBottom: 0,
     },
     chipWrapper: {
         flexDirection: 'column',
@@ -703,47 +655,39 @@ const categoryStyles = StyleSheet.create({
         marginRight: 8,
         marginBottom: 10,
     },
-chipActions: {
-    position: 'absolute',
-    top: -15,     
-    right: -1,    
-    flexDirection: 'row',
-    gap: 4,
-    zIndex: 10,
-},
+    chipActions: {
+        position: 'absolute',
+        top: -15,
+        right: -1,
+        flexDirection: 'row',
+        gap: 4,
+        zIndex: 10,
+    },
     chipActionBtn: {
         padding: 2,
-        
-  
     },
     createChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        height:40,
-        marginBottom:30,
-        borderRadius:99,
-        padding:10,
-        backgroundColor:'#94a3b8'
-
+        height: 40,
+        marginBottom: 30,
+        borderRadius: 99,
+        padding: 10,
+        backgroundColor: '#94a3b8',
     },
     createChipActive: {
         backgroundColor: '#0f172a',
-        height:40,
-       padding:10,
-        borderRadius:100,
+        height: 40,
+        padding: 10,
+        borderRadius: 100,
     },
     createChipText: {
         fontSize: 13,
         fontWeight: '600',
-   
-        
-
-
     },
     createChipTextActive: {
         color: '#fff',
-        textAlign:'center',
-
+        textAlign: 'center',
     },
 });
 

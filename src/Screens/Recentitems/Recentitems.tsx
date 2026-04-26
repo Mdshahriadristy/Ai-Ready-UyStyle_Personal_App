@@ -32,7 +32,7 @@ const CARD_SIZE = (SCREEN_W - 48) / 2;
 
 // ─── Type ─────────────────────────────────────────────────────────────────────
 
-type OutfitItem = {
+type closetItems= {
     id:        string;
     title:     string;
     category:  string;
@@ -41,9 +41,9 @@ type OutfitItem = {
     createdAt: any;
 };
 
-// ─── Same mapper as OutfitScreen ──────────────────────────────────────────────
+// ─── Same mapper as closetItemscreen ──────────────────────────────────────────────
 
-const mapOutfitDoc = (d: QueryDocumentSnapshot<DocumentData>): OutfitItem => {
+const mapOutfitDoc = (d: QueryDocumentSnapshot<DocumentData>): closetItems=> {
     const data        = d.data();
     const itemDetails = data.itemDetails || {};
     const firstKey    = Object.keys(itemDetails)[0];
@@ -60,21 +60,21 @@ const mapOutfitDoc = (d: QueryDocumentSnapshot<DocumentData>): OutfitItem => {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-const AllitemsScreen = () => {
+const Recentitems = () => {
     const navigation = useNavigation<any>();
     const db   = getFirestore(getApp());
     const user = getAuth(getApp()).currentUser;
 
-    const [items,   setItems]   = useState<OutfitItem[]>([]);
+    const [items,   setItems]   = useState<closetItems[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user) return;
-        const fetchOutfits = async () => {
+        const fetchclosetItems = async () => {
             try {
                 const snap = await getDocs(
                     query(
-                        collection(db, 'outfits'),
+                        collection(db, 'closetItems'),
                         where('userId', '==', user.uid),
                         orderBy('createdAt', 'desc')
                     )
@@ -86,10 +86,10 @@ const AllitemsScreen = () => {
                 setLoading(false);
             }
         };
-        fetchOutfits();
+        fetchclosetItems();
     }, []);
 
-    const renderItem = ({ item }: { item: OutfitItem }) => (
+    const renderItem = ({ item }: { item: closetItems}) => (
         <View style={s.card}>
             {item.imageURL ? (
                 <Image source={{ uri: item.imageURL }} style={s.cardImage} resizeMode="cover" />
@@ -120,7 +120,7 @@ const AllitemsScreen = () => {
                 >
                     <ArrowLeft size={22} color="#1E293B" />
                 </TouchableOpacity>
-                <Text style={s.headerTitle}>Recent Outfits</Text>
+                <Text style={s.headerTitle}>Recent Items</Text>
                 <View style={{ width: 36 }} />
             </View>
 
@@ -131,7 +131,7 @@ const AllitemsScreen = () => {
             ) : items.length === 0 ? (
                 <View style={s.centered}>
                     <Shirt size={48} color="#E2E8F0" />
-                    <Text style={s.emptyText}>No outfits created yet</Text>
+                    <Text style={s.emptyText}>No closetItems created yet</Text>
                 </View>
             ) : (
                 <FlatList
@@ -143,7 +143,7 @@ const AllitemsScreen = () => {
                     contentContainerStyle={s.listContent}
                     showsVerticalScrollIndicator={false}
                     ListHeaderComponent={
-                        <Text style={s.countText}>{items.length} outfits</Text>
+                        <Text style={s.countText}>{items.length} closetItems</Text>
                     }
                 />
             )}
@@ -207,4 +207,4 @@ const s = StyleSheet.create({
     },
 });
 
-export default AllitemsScreen;
+export default Recentitems;
